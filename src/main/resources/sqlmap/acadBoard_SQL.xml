@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+  <mapper namespace="kr.or.ddit.mapper.ACADNoticeBoardMapper">
+
+  	<select id="getNbNum" resultType="int">
+  		SELECT NVL(MAX(NB_NUM),0) + 1 FROM NOTICE_BOARD
+  	</select>
+
+  	<insert id="createPost" parameterType="nbVO">
+  		INSERT INTO NOTICE_BOARD(NB_NUM, EMP_NUM, NB_TITLE, NB_CONTENT, NB_DT, NB_CATE, NB_READ)
+  		VALUES (#{nbNum}, #{empNum}, #{nbTitle}, #{nbContent}, SYSDATE, #{nbCate}, #{nbRead})
+  	</insert>
+
+ 	 <update id="filesPost" parameterType="java.util.List">
+ 	 	<selectKey resultType="int" order="BEFORE" keyProperty="nbfNum">
+ 	 		SELECT NVL(MAX(NBF_NUM),0) + 1 FROM NOTICE_BOARD_FILE
+ 	 	</selectKey>
+ 	 	<foreach collection="list" item="nfVO"
+ 	 			 open="insert all" close="select * from dual" separator=" " index="idx">
+ 	 		INTO NOTICE_BOARD_FILE(NBF_NUM, N_NUM, NBF_FILENM, NBF_CATE)
+ 	 		VALUES(#{idx}+#{nbfNum}, #{nfVO.nNum}, #{nfVO.nbfFilenm}, #{nfVO.nbfCate})
+	 	</foreach>
+ 	 </update>
+
+  	<sql id="boardSearch">
+		<if test="category=='title' and keyword!=null and keyword!=''">
+			and(
+				   NB_TITLE LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+		<if test="category=='content' and keyword!=null and keyword!=''">
+			and(
+				   NB_CONTENT LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+		<if test="keyword!=null and keyword!=''">
+			and(
+				   NB_TITLE LIKE '%' || #{keyword} || '%'
+				OR NB_CONTENT LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+ 	</sql>
+
+ 	<sql id="boardCate">
+ 		<if test="cate == '일반'">
+ 			and(
+ 				NB_CATE = '일반'
+ 			)
+ 		</if>
+ 		<if test="cate == '학사'">
+ 			and(
+ 				NB_CATE = '학사'
+ 			)
+ 		</if>
+ 		<if test="cate == '장학'">
+ 			and(
+ 				NB_CATE = '장학'
+ 			)
+ 		</if>
+ 	</sql>
+
+ 	 <select id="getTotal" parameterType="hashMap" resultType="int">
+ 	 	SELECT COUNT(*) FROM NOTICE_BOARD
+ 	 	WHERE 1=1
+ 	 	<include refid="boardCate" />
+ 	 	<include refid="boardSearch" />
+ 	 </select>
+
+	<select id="getNoticeList" parameterType="hashMap" resultType="nbVO">
+		WITH U AS(
+		    SELECT ROW_NUMBER() OVER (ORDER BY A.NB_READ DESC) RNUM, A.*
+		    FROM(
+                    SELECT NB_NUM, EMP_NUM, NB_TITLE, NB_CONTENT, NB_DT, NB_HIT, NB_CATE, NB_READ
+                    FROM NOTICE_BOARD
+                    WHERE 1=1
+                    <include refid="boardCate" />
+                    <include refid="boardSearch" />
+                    ORDER BY NB_DT DESC) A
+		)
+		SELECT U.*
+		FROM U
+		WHERE u.rnum between (#{currentPage} * #{size}) - (#{size} - 1) and #{currentPage} * #{size}
+	</select>
+
+	<select id="mainAcadNoticeList" resultType="nbVO">
+	    SELECT T.*
+	    FROM(
+             SELECT  ROW_NUMBER() OVER (ORDER BY NB_DT DESC) RNUM,
+                     NB_NUM, EMP_NUM, NB_TITLE, NB_CONTENT, NB_DT, NB_HIT, NB_CATE, NB_READ
+             FROM NOTICE_BOARD) T
+	    WHERE RNUM BETWEEN 1 AND 3
+	</select>
+
+  	<update id="upHit" parameterType="int">
+  		UPDATE NOTICE_BOARD SET NB_HIT = NB_HIT + 1 WHERE NB_NUM = #{data}
+  	</update>
+
+
+
+ 	<resultMap type="nbVO" id="noteMap">
+ 		<result property="nbNum" column="NB_NUM" />
+ 		<result property="empNum" column="EMP_NUM" />
+ 		<result property="nbTitle" column="NB_TITLE" />
+ 		<result property="nbContent" column="NB_CONTENT" />
+ 		<result property="nbDt" column="NB_DT" />
+ 		<result property="nbHit" column="NB_HIT" />
+ 		<result property="nbCate" column="NB_CATE" />
+ 		<result property="nbRead" column="NB_READ" />
+ 		<collection property="fileVOList" resultMap="fileMap"></collection>
+ 	</resultMap>
+
+ 	<resultMap type="nfVO" id="fileMap">
+ 		<result property="nbfNum" column="NBF_NUM" />
+ 		<result property="nNum" column="N_NUM" />
+ 		<result property="nbfFilenm" column="NBF_FILENM" />
+ 		<result property="nbfCate" column="NBF_CATE" />
+ 	</resultMap>
+
+  	<select id="detail" parameterType="int" resultMap="noteMap">
+        SELECT A.NB_NUM, A.EMP_NUM, A.NB_TITLE, A.NB_CONTENT, A.NB_DT, A.NB_HIT, A.NB_CATE, A.NB_READ,
+                B.NBF_NUM, B.N_NUM, B.NBF_FILENM, B.NBF_CATE
+        FROM NOTICE_BOARD A LEFT OUTER JOIN NOTICE_BOARD_FILE B
+        ON(A.NB_NUM = B.N_NUM)
+        WHERE A.NB_NUM = #{data}
+  	</select>
+
+  	<delete id="deleteNF" parameterType="int">
+  		DELETE FROM NOTICE_BOARD_FILE
+  		WHERE N_NUM = #{data}
+  	</delete>
+
+  	<delete id="deleteNB" parameterType="int">
+  		DELETE FROM NOTICE_BOARD
+  		WHERE NB_NUM = #{data}
+  	</delete>
+
+  	<delete id="deleteFile" parameterType="int">
+  		DELETE FROM NOTICE_BOARD_FILE
+  		WHERE NBF_NUM = #{data}
+  	</delete>
+
+  	<update id="updatePost" parameterType="nbVO">
+  		UPDATE NOTICE_BOARD SET
+  				NB_TITLE = #{nbTitle}, NB_CONTENT = #{nbContent}, NB_DT = SYSDATE, NB_READ = #{nbRead},
+  				NB_CATE = #{nbCate}, EMP_NUM = #{empNum}
+  		WHERE NB_NUM = #{nbNum}
+  	</update>
+
+  </mapper>

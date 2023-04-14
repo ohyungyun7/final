@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.EnrollMapper">
+	
+	<select id="getSubjectList" parameterType="subjectVO" resultType="subjectVO">
+		SELECT A.SBJ_NUM, A.DEPT_NUM, A.TEA_NUM, A.SBJ_TITLE, A.SBJ_GRADE, A.SBJ_RECODE, A.SBJ_PERSONNEL, 
+				A.SBJ_YN, A.SBJ_COMRE, A.SBJ_OC, A.SBJ_RS, B.TEA_NM_KOR, C.DEPT_NM, 
+				(SELECT COUNT(*) FROM LECTURE_TM D WHERE A.SBJ_NUM = D.SBJ_NUM) COUNT
+		FROM SUBJECT A, TEACHER B, DEPARTMENT C
+		WHERE A.TEA_NUM = B.TEA_NUM
+		AND A.DEPT_NUM = C.DEPT_NUM
+		<if test='teaNum != null and teaNum != 0'>
+			AND A.TEA_NUM = #{teaNum}
+		</if>
+		ORDER BY 1 DESC
+	</select>
+	
+	<select id="makeSbjNum" parameterType="int" resultType="string">
+		SELECT NVL(SUBSTR(A.SBJ_NUM, 1,3) || LPAD(SUBSTR(A.SBJ_NUM, 4) + 1, 5, 0), 
+		        SUBSTR(UPPER(B.TEA_NM_ENG), LENGTH(B.TEA_NM_ENG) -2) || '01001')
+		FROM (SELECT MAX(SBJ_NUM) SBJ_NUM FROM SUBJECT WHERE TEA_NUM = #{teaNum}) A,
+		     (SELECT TEA_NM_ENG FROM TEACHER WHERE TEA_NUM = #{teaNum}) B
+	</select>
+	
+	<update id="insertSubject" parameterType="HashMap">
+		MERGE INTO SUBJECT A 
+		USING DUAL
+		ON(A.SBJ_NUM = #{sbjNum}) 
+		WHEN MATCHED THEN 
+		    UPDATE SET SBJ_TITLE = #{sbjTitle}, SBJ_GRADE = #{sbjGrade}, 
+		               SBJ_RECODE = #{sbjRecode}, SBJ_PERSONNEL = #{sbjPersonnel}, SBJ_RS = #{sbjRs}, 
+		               SBJ_YN = 0, DEPT_NUM = #{deptNum}
+		WHEN NOT MATCHED THEN 
+		    INSERT(SBJ_NUM, TEA_NUM, SBJ_TITLE, SBJ_GRADE, SBJ_RECODE, SBJ_PERSONNEL, SBJ_RS, DEPT_NUM)
+		    VALUES(#{sbjNum}, #{teaNum}, #{sbjTitle}, #{sbjGrade}, #{sbjRecode}, #{sbjPersonnel}, #{sbjRs}, #{deptNum})
+	</update>
+
+	<insert id="insertSubjectPlan" parameterType="HashMap">
+		<selectKey resultType="string" order="BEFORE" keyProperty="spNum">
+			SELECT TO_CHAR(SEQ_SUBJECT_PLAN.NEXTVAL) FROM DUAL
+		</selectKey>
+		
+		INSERT INTO SUBJECT_PLAN(SP_NUM, SBJ_NUM, SP_MIDDLERATIO, SP_FINALRATIO, SP_HWRATIO, 
+								SP_ATTRATIO, SP_ETCRATIO, SP_ONLINEYN, SP_TEXTBOOK)
+		VALUES(#{spNum}, #{sbjNum}, #{spMiddleratio}, #{spFinalratio}, #{spHwratio}, 
+				#{spAttratio}, #{spEtcratio}, #{sbjYn}, #{spTextbook})
+	</insert>
+
+	<update id="updateSubjectPlan" parameterType="HashMap">
+		UPDATE SUBJECT_PLAN 
+		SET SP_MIDDLERATIO = #{spMiddleratio}, SP_FINALRATIO = #{spFinalratio}, SP_HWRATIO = #{spHwratio}, 
+			SP_ATTRATIO = #{spAttratio}, SP_ETCRATIO = #{spEtcratio}, SP_ONLINEYN = #{sbjYn}, SP_TEXTBOOK = #{spTextbook}
+		WHERE SP_NUM = #{spNum}
+		  AND SBJ_NUM = #{sbjNum}
+	</update>
+	
+	<update id="insertSubjectIndex" parameterType="java.util.List">
+			MERGE INTO SUBJECT_INDEX A
+			USING (
+				<foreach collection="list" item="siVO" open="" close="" separator="UNION" index="idx">
+					SELECT #{siVO.siNum} AS SI_NUM, #{siVO.spNum} AS SP_NUM, 
+							#{siVO.sbjNum} AS SBJ_NUM, #{siVO.siTarget} AS SI_TARGET
+					FROM DUAL
+				</foreach>
+			) B
+			ON (A.SP_NUM = B.SP_NUM AND A.SI_NUM=B.SI_NUM)
+			WHEN MATCHED THEN 
+					UPDATE SET SI_TARGET = B.SI_TARGET
+			WHEN NOT MATCHED THEN 
+			    INSERT (SI_NUM, SP_NUM, SBJ_NUM, SI_TARGET)
+				VALUES(B.SI_NUM, B.SP_NUM, B.SBJ_NUM, B.SI_TARGET)
+	</update>
+	
+	<select id="getSubject" parameterType="string" resultType="subjectVO">
+		SELECT SBJ_NUM, DEPT_NUM, TEA_NUM, SBJ_TITLE, SBJ_GRADE, 
+				SBJ_RECODE, SBJ_PERSONNEL, SBJ_YN, SBJ_COMRE, SBJ_OC, SBJ_RS
+		FROM SUBJECT
+		WHERE SBJ_NUM = #{sbjNum}
+	</select>
+	
+	<select id="getSubjectPlan" parameterType="string" resultType="subjectPlanVO">
+		SELECT SP_NUM, SBJ_NUM, SP_MIDDLERATIO, SP_FINALRATIO, SP_HWRATIO, 
+		        SP_ATTRATIO, SP_ETCRATIO, SP_ONLINEYN, SP_TEXTBOOK
+		FROM SUBJECT_PLAN A
+		WHERE SP_NUM = (SELECT MAX(SP_NUM) SP_NUM FROM SUBJECT_PLAN WHERE SBJ_NUM = #{sbjNum})
+	</select>
+	
+	<select id="getSubjectIndexList" parameterType="String" resultType="subjectIndexVO">
+		SELECT SI_NUM, SP_NUM, SBJ_NUM, SI_TARGET
+		FROM SUBJECT_INDEX
+		WHERE SP_NUM = #{spNum}
+		ORDER BY TO_NUMBER(SI_NUM)
+	</select>
+	
+	<delete id="deleteSubject" parameterType="String">
+		DELETE FROM SUBJECT WHERE SBJ_NUM = #{sbjNum}
+	</delete>
+	
+	<select id="getBuilding" resultType="buildingVO">
+		SELECT BUILDING_CODE, BUILDING_NAME FROM BUILDING
+	</select>
+	
+	<select id="getRoomList" parameterType="String" resultType="roomVO">
+		SELECT ROOM_CODE, BUILDING_CODE, ROOM_FLR, ROOM_CAPACITY, ROOM_LECT, ROOM_PHOTO
+		FROM ROOM
+		WHERE BUILDING_CODE = #{buildingCOde}
+	</select>
+	
+	<resultMap type="timeVO" id="timeMap">
+		<result property="timeTcode" column="TIME_TCODE" />
+	</resultMap>
+	
+	<resultMap type="subjectVO" id="sbjMap">
+		<result property="sbjTitle" column="SBJ_TITLE" />
+		<collection property="timeTcodeList" resultMap="timeMap" />
+	</resultMap>
+	
+	<select id="getTimeTable" parameterType="String" resultMap="sbjMap">
+		SELECT (SELECT SBJ_TITLE FROM SUBJECT C WHERE C.SBJ_NUM = A.SBJ_NUM) SBJ_TITLE
+				, A.TIME_TCODE
+		FROM LECTURE_TM A, 
+			(SELECT TIME_TCODE, ROOM_CODE FROM ROOM_SCHEDULE WHERE ROOM_CODE=#{roomCode} AND RS_ISEMPTY = 1) B
+		WHERE A.ROOM_CODE = B.ROOM_CODE
+		AND A.TIME_TCODE = B.TIME_TCODE
+	</select>
+	
+	<update id="mergeRoomSchedule" parameterType="java.util.List">
+		MERGE INTO ROOM_SCHEDULE A
+			USING (
+				<foreach collection="list" item="ltVO" open="" close="" separator="UNION" index="idx">
+					SELECT #{ltVO.roomCode} AS ROOM_CODE, #{ltVO.timeTcode} AS TIME_TCODE
+					FROM DUAL
+				</foreach>
+			) B
+			ON (A.ROOM_CODE = B.ROOM_CODE AND A.TIME_TCODE=B.TIME_TCODE)
+			WHEN MATCHED THEN 
+					UPDATE SET RS_ISEMPTY = 1
+			WHEN NOT MATCHED THEN 
+			    INSERT (ROOM_CODE, TIME_TCODE, RS_ISEMPTY)
+				VALUES(B.ROOM_CODE, B.TIME_TCODE, 1)
+	</update>
+	
+	<update id="insertTime" parameterType="java.util.List">
+		INSERT INTO LECTURE_TM (LT_NUM, SBJ_NUM, ROOM_CODE, TIME_TCODE)
+			SELECT SEQ_LECTURE_TIME.NEXTVAL AS LT_NUM
+				 , T.* 
+			  FROM (
+			         <foreach collection="list" item="ltVO" index="index" separator="union all">
+					SELECT #{ltVO.sbjNum} as SBJ_NUM, 
+							#{ltVO.roomCode} as ROOM_CODE, 
+							#{ltVO.timeTcode} as TIME_TCODE
+					 FROM DUAL
+			         </foreach> 
+			  ) T
+	</update>
+	
+	<select id="getTimeData" parameterType="string" resultType="hashMap">
+		SELECT B.BUILDING_CODE, C.ROOM_CODE, A.TIME_TCODE, B.BUILDING_NAME, C.ROOM_LECT
+		FROM ROOM_SCHEDULE A, BUILDING B, ROOM C
+		WHERE (A.ROOM_CODE, A.TIME_TCODE) IN (SELECT ROOM_CODE, TIME_TCODE FROM LECTURE_TM WHERE SBJ_NUM=#{sbjNum})
+		AND A.ROOM_CODE = C.ROOM_CODE
+		AND C.BUILDING_CODE = B.BUILDING_CODE
+	</select>
+	
+	<select id="countTime" parameterType="String" resultType="int">
+		SELECT count(*) FROM LECTURE_TM WHERE SBJ_NUM = #{sbjNum}
+	</select>
+	
+	<delete id="deleteTime" parameterType="string">
+		DELETE FROM LECTURE_TM WHERE SBJ_NUM = #{sbjNum}
+	</delete>
+	
+	<update id="updateSubjectOk" parameterType="string">
+		UPDATE SUBJECT SET SBJ_YN = 1, SBJ_COMRE = ''
+		WHERE SBJ_NUM = #{sbjNum}
+	</update>
+	
+	<update id="updateSubjectCom" parameterType="subjectVO">
+		UPDATE SUBJECT 
+		SET SBJ_YN = 2, SBJ_COMRE = #{sbjComre}
+		WHERE SBJ_NUM = #{sbjNum}
+	</update>
+</mapper>
+

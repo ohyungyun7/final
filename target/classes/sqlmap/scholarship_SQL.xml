@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.ScholarshipMapper">
+
+
+	<!--(교수) 학생 성적순으로 리스트 조회 -->
+<!-- 	<select id=""> -->
+<!-- 	 <![CDATA[ -->
+<!-- 	  SELECT Z.* -->
+<!--         FROM ( -->
+<!--             SELECT ROW_NUMBER() OVER(ORDER BY T.CL_FSCORE DESC) RNUM ,T.* -->
+<!--                     FROM( -->
+<!--                     SELECT A.STU_NUM,  B.STU_NM_KOR  , B.STU_PN , ROUND(AVG(CL_FSCORE),2) CL_FSCORE -->
+<!--                         FROM COURSE_LIST A , STUDENT B -->
+<!--                         WHERE A.STU_NUM = B.STU_NUM -->
+<!--                         AND -->
+<!--                         B.DEPT_NUM = #{deptNum} -->
+<!--                         AND -->
+<!--                         A.CL_SEMESTER = '2023-02' -->
+<!--                         GROUP BY  A.STU_NUM,  B.STU_NM_KOR  , B.STU_PN -->
+<!--                         ORDER BY CL_FSCORE DESC -->
+<!--                     )T -->
+<!--          )  Z -->
+<!--       WHERE Z.RNUM <= 3 -->
+<!--       ]]> -->
+
+<!-- 	</select> -->
+
+
+	<!-- (교수) 학과의 학생 전체 리스트 조회 -->
+	<select id="deptStudentList" resultType="scholarshipVO" parameterType="hashMap">
+		SELECT A.STU_NUM, A.STU_NM_KOR, A.STU_PN, B.DEPT_NUM
+				FROM STUDENT A, DEPARTMENT B
+				WHERE A.DEPT_NUM = B.DEPT_NUM
+	            AND
+	            B.DEPT_NUM=#{deptNum}
+	</select>
+
+	<!-- (교수) 학과의 학생 1명 상세보기 -->
+	<select id="deptNum" parameterType="hashMap" resultType="scholarshipVO">
+		SELECT A.STU_NUM, A.STU_NM_KOR,  B.DEPT_NUM
+			FROM  STUDENT A, DEPARTMENT B
+		WHERE A.DEPT_NUM = B.DEPT_NUM
+		AND A.STU_NUM =#{stuNum}
+	</select>
+
+	<!-- (교수) 교수가 추천한 학생리스트 출력 -->
+	<select id="deptProList" resultType="scholarshipVO" parameterType="hashMap">
+		SELECT A.STU_NUM, A.SRE_REASON, A.SL_NUM, B.STU_NM_KOR, B.STU_PN,
+		     CASE WHEN A.SRE_YN=0 THEN '대기'
+		          WHEN A.SRE_YN=1 THEN '승인'
+		          WHEN A.SRE_YN=2 THEN '반려'
+		           END SRE_YN,
+		    CASE WHEN A.SL_NUM=1 THEN '성적우수 장학금'
+		         WHEN A.SL_NUM=2 THEN '교수추천 장학금'
+		         END SL_NM
+		FROM  SCHOLARSHIP_RECOMM A, STUDENT B
+		WHERE A.STU_NUM = B.STU_NUM
+		AND TEA_NUM =#{teaNum}
+	</select>
+
+	<!-- (교수) 교수가 학생 장학 추천 -->
+	<insert id="insertRecommend" parameterType="hashMap">
+		INSERT INTO SCHOLARSHIP_RECOMM
+		(SRE_NUM, STU_NUM, TEA_NUM, SRE_REASON, SRE_YN, SRE_COMRE, SRE_SEMESTER, SL_NUM)
+		VALUES
+		(SEQ_SCHOLASHIP_RECOMMENDATION.NEXTVAL, #{stuNum},#{teaNum},#{recommendReason},0,null,#{sreYsemester},2)
+	</insert>
+
+	<!-- (교수) 교수가 추천한 학생 1명 상세보기 -->
+	<select id="waitNum" parameterType="hashMap" resultType="scholarshipVO">
+		SELECT A.STU_NUM, A.SRE_REASON, A.SRE_YN, B.STU_NM_KOR,
+	         SUBSTR(A.SRE_SEMESTER,1,4) ||'년 ' || SUBSTR(A.SRE_SEMESTER,6,6) ||'학기' SR_YSEMESTER,
+	         CASE WHEN SL_NUM = 1 THEN '성적우수 장학금'
+	             WHEN SL_NUM = 2 THEN '교수추천 장학금'
+	             END SL_NM, A.SRE_COMRE
+		FROM SCHOLARSHIP_RECOMM A, STUDENT B
+		WHERE A.STU_NUM = B.STU_NUM
+        AND A.STU_NUM = #{stuNum}
+	</select>
+
+	<!-- (관리자) 학생 장학금 추천 리스트 조회 -->
+	<select id="admScholarshipList" resultType="scholarshipVO">
+      			SELECT B.STU_NM_KOR, C.TEA_NM_KOR, B.STU_NUM, B.STU_PN, E.DEPT_NM, A.SRE_NUM,
+		      A.SRE_REASON,
+              CASE WHEN A.SRE_YN=0 THEN '대기'
+                   WHEN A.SRE_YN=1 THEN '승인'
+                   WHEN A.SRE_YN=2 THEN '반려'
+              END SRE_YN,
+		      A.SRE_SEMESTER, D.SL_NM
+		FROM SCHOLARSHIP_RECOMM A INNER JOIN STUDENT B
+		     ON(A.STU_NUM = B.STU_NUM)
+		     INNER JOIN TEACHER C
+		     ON(A.TEA_NUM = C.TEA_NUM)
+		     INNER JOIN SCHOLARSHIP_LIST D
+		     ON(D.SL_NUM=A.SL_NUM)
+		     INNER JOIN DEPARTMENT E
+		     ON(E.DEPT_NUM = B.DEPT_NUM)
+		     ORDER BY A.SRE_NUM ASC
+	</select>
+
+	<!-- 장학금 승인 리스트 -->
+	<select id="paymentsList" resultType="scholarshipVO">
+		SELECT A.SR_NUM, A.STU_NUM,
+			   A.SL_NUM, C.DEPT_NM, D.SL_NM,B.STU_PN,
+			   B.STU_NM_KOR, D.SL_NM,
+		 CASE WHEN A.SR_YN=0 THEN '미지급'
+			     WHEN A.SR_YN=1 THEN '지급'
+			     END SR_YN,
+			     A.SR_SEMESTER
+	 	FROM SCHOLARSHIP_REDETAIL A, STUDENT B, DEPARTMENT C, SCHOLARSHIP_LIST D
+		     WHERE A.STU_NUM = B.STU_NUM
+			 AND B.DEPT_NUM = C.DEPT_NUM
+			 AND D.SL_NUM = A.SL_NUM
+			 AND A.SR_SEMESTER  LIKE '%2023-01%'
+			 ORDER BY A.SR_NUM DESC
+	</select>
+
+	<!-- (관리자) 장학생 추천받은 학생 1명 정보 가져오기 -->
+	<select id="showNum" resultType="scholarshipVO" parameterType="hashMap">
+		  SELECT A.STU_NUM, A.SRE_NUM, B.STU_NM_KOR , A.TEA_NUM, C.SL_NM, C.SL_NUM,
+		          	  A.SRE_REASON, A.SRE_YN, A.SRE_COMRE,
+	                  SUBSTR(A.SRE_SEMESTER,1,4) ||'년 ' || SUBSTR(A.SRE_SEMESTER,6,6) ||'학기' SRE_YSEMESTER
+			    FROM SCHOLARSHIP_RECOMM A, STUDENT B , SCHOLARSHIP_LIST C
+			    WHERE
+			    A.STU_NUM = B.STU_NUM
+			    AND
+	            A.SL_NUM = C.SL_NUM
+	            AND
+			    A.STU_NUM = #{stuNum}
+	</select>
+
+	<!-- (관리자) 장학금 지급 받은 학생 1명 정보 가져오기 -->
+	<select id="paymentNum" resultType="scholarshipVO" parameterType="hashMap">
+<!-- 	SELECT A.STU_NUM , B.STU_NM_KOR, C.SL_NM, C.SL_AMT || '원' SLWON, -->
+<!-- 		       SUBSTR(A.SR_SEMESTER,1,4) ||'년 ' || SUBSTR(A.SR_SEMESTER,6,6) ||'학기' SR_YSEMESTER, -->
+<!-- 		            A.SR_DATE, -->
+<!--         CASE WHEN A.SR_YN = 0 THEN '지급' -->
+<!--              WHEN A.SR_YN = 1 THEN '미지급' -->
+<!--              END SR_YN -->
+<!-- 		  FROM SCHOLARSHIP_REDETAIL A, STUDENT B, SCHOLARSHIP_LIST C -->
+<!-- 		  WHERE A.STU_NUM = B.STU_NUM -->
+<!-- 		  AND A.SL_NUM = C.SL_NUM -->
+<!-- 		  AND A.STU_NUM = #{showStuNum} -->
+
+		 SELECT A.STU_NUM , B.STU_NM_KOR, C.SL_NM, C.SL_AMT || '원' SLWON,
+		       SUBSTR(A.SR_SEMESTER,1,4) ||'년 ' || SUBSTR(A.SR_SEMESTER,6,6) ||'학기' SR_YSEMESTER,
+		            A.SR_DATE,
+        CASE WHEN A.SR_YN = 0 THEN '미지급'
+             WHEN A.SR_YN = 1 THEN '지급'
+             END SR_YN
+		  FROM SCHOLARSHIP_REDETAIL A, STUDENT B, SCHOLARSHIP_LIST C
+		  WHERE A.STU_NUM = B.STU_NUM
+		  AND A.SL_NUM = C.SL_NUM
+          AND A.SR_SEMESTER  LIKE '%2023-01%'
+		  AND A.STU_NUM = #{stuNum}
+          AND C.SL_NM = #{slNm}
+	</select>
+
+	<!-- (학생) 장학금 수혜 내역 -->
+	<select id="stuScholarshipList" resultType="scholarshipVO" parameterType="hashMap">
+		 SELECT S.STU_NUM, S.STU_NM_KOR,
+		        SL.SL_NM, SL.SL_AMT,
+		              SUBSTR(SR.SR_SEMESTER,1,4) ||'년' SRE_YEAR,
+		              SUBSTR(SR.SR_SEMESTER,6,6) ||'학기' SRE_SEMESTER,
+		              SUBSTR(SR.SR_SEMESTER,1,4) ||'년 ' || SUBSTR(SR.SR_SEMESTER,6,6) ||'학기' SRE_YSEMESTER
+
+		FROM SCHOLARSHIP_LIST SL, SCHOLARSHIP_REDETAIL SR, STUDENT S
+		WHERE SL.SL_NUM = SR.SL_NUM
+		AND
+		S.STU_NUM = SR.STU_NUM
+		AND S.STU_NUM = #{stuNum}
+        ORDER BY SRE_YSEMESTER DESC
+	</select>
+
+	<!-- (관리자) 장학생 추천 승인 -->
+	<update id="updateState" parameterType="hashMap">
+		UPDATE SCHOLARSHIP_RECOMM SET
+		SRE_YN = #{status} WHERE STU_NUM = #{stuNum}
+	</update>
+
+	<!-- (관리자) 장학생 추천 반려 -->
+	<update id="updateState2" parameterType="hashMap">
+		UPDATE SCHOLARSHIP_RECOMM SET
+		SRE_YN = #{status} , SRE_COMRE=#{sreComre} WHERE STU_NUM = #{stuNum}
+	</update>
+
+	<!-- (관리자) 장학금 지급 변경-->
+	<update id="updateState3" parameterType="hashMap">
+		UPDATE SCHOLARSHIP_REDETAIL SET
+		SR_YN = #{status} WHERE STU_NUM = #{stuNum1}
+	</update>
+
+	<!-- (관리자)추천 승인 후 장학수혜 내역테이블에 추가 -->
+	<insert id="insertRedetail" parameterType="hashMap">
+		INSERT INTO SCHOLARSHIP_REDETAIL
+		(SR_NUM, STU_NUM, SL_NUM, SR_SEMESTER, SR_YN, SR_DATE)
+			VALUES
+		(SEQ_SCHOLASHIP_REDETAIL.nextval, #{stuNum}, #{slNum}, #{sreYsemester}, 0, #{nowDate})
+	</insert>
+
+	<!-- (관리자)추천 반려 후 추천 테이블에서 삭제 -->
+	<delete id="deleteRecomm" parameterType="int">
+	   DELETE FROM SCHOLARSHIP_RECOMM
+       WHERE SRE_NUM = #{sreNum}
+	</delete>
+
+	<!-- 해당 학번이 장학생 추천 테이블에 있는지 없는지 확인 -->
+	<select id="countRecomm" parameterType="int" resultType="int">
+		SELECT COUNT(*)
+		FROM SCHOLARSHIP_RECOMM
+		WHERE STU_NUM = #{stuNum}
+	</select>
+
+</mapper>

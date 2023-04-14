@@ -1,0 +1,152 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.mapper.TeacherMapper">
+	<sql id="where">
+		<if test="category=='teanum' and keyword!=null and keyword!=''">
+			AND   (TEA_NUM   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="category=='teanmkor' and keyword!=null and keyword!=''">
+			AND   (TEA_NM_KOR   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="category=='major' and keyword!=null and keyword!=''">
+			AND   (MAJOR   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="category=='teatitle' and keyword!=null and keyword!=''">
+			AND   (TEA_TITLE   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="keyword!=null and keyword!=''">
+			AND(
+				   TEA_NUM LIKE '%' || #{keyword} || '%'
+				OR TEA_NM_KOR LIKE '%' || #{keyword} || '%'
+				OR MAJOR LIKE '%' || #{keyword} || '%'
+				OR TEA_TITLE LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+  	</sql>
+
+	 <select id="getTotal" parameterType="hashMap" resultType="int">
+ 	 	 WITH T AS(
+		      SELECT ROW_NUMBER() OVER(ORDER BY TEA_NUM DESC) RNUM,
+		               TEA_NUM, TEA_NM_KOR, MAJOR, TEA_TITLE
+		      FROM TEACHER
+		      WHERE 1=1)
+ 	 	SELECT COUNT(*) FROM TEACHER
+ 	 	WHERE 1=1
+ 	 	<include refid="where" />
+ 	 </select>
+
+	<!-- (교수) 리스트 조회 -->
+	<select id="proList" resultType="teaVO" parameterType="HashMap">
+		   WITH T AS(
+		      SELECT ROW_NUMBER() OVER(ORDER BY TEA_NUM DESC) RNUM,
+		               TEA_NUM, TEA_NM_KOR, MAJOR, TEA_TITLE
+		      FROM TEACHER
+		      WHERE 1=1
+     	    <include refid="where" />
+		       )
+		        SELECT T.TEA_NUM, T.TEA_NM_KOR, T.MAJOR, T.TEA_TITLE
+		        FROM T
+         WHERE T.RNUM BETWEEN (#{currentPage} * #{size}) - (#{size} - 1) and (#{currentPage} * #{size})
+	</select>
+
+
+	<!-- (교수) 1명 상세조회 -->
+	<select id="teaNum" resultType="teaVO" parameterType="HashMap">
+		SELECT T.TEA_NUM, T.TEA_NM_KOR, T.TEA_NM_ENG, T.MAJOR, T.TEA_TITLE, T.TEA_PN, T.TEA_REG1, T.TEA_REG2,
+		       T.TEA_BANK, T.TEA_ACCOUNT, T.TEA_ZIP, T.TEA_ADDR1, T.TEA_ADDR2, T.TEA_EMAIL, T.TEA_PHOTO, D.DEPT_NM, D.DEPT_NUM
+		  FROM TEACHER T, DEPARTMENT D
+		 WHERE T.DEPT_NUM = D.DEPT_NUM
+		   AND T.TEA_NUM = #{teaNum}
+	</select>
+
+	<select id="getDepartMentNm" resultType="departmentVO">
+		SELECT DEPT_NUM ,DEPT_NM FROM DEPARTMENT
+	</select>
+
+	<!-- (교수) 삭제 -->
+ 	<delete id="deleteTea" parameterType="HashMap">
+ 		DELETE TEACHER WHERE TEA_NUM = #{teaNum}
+ 	</delete>
+
+	<!-- (교수) 아이디삭제 -->
+	<delete id="deleteUsers" parameterType="HashMap">
+		DELETE FROM USERS WHERE USERNAME = (SELECT USERNAME FROM USERS WHERE USERNAME = #{teaNum})
+ 	</delete>
+
+
+	<!-- (교수) 권한삭제  -->
+ 	<delete id="deleteAuth" parameterType="HashMap">
+		DELETE FROM AUTHENTICATE WHERE USERNAME = (SELECT USERNAME FROM AUTHENTICATE WHERE USERNAME = #{teaNum})
+ 	</delete>
+
+
+	<!-- (교수) 모달창 수정 -->
+ 	<update id="updateTeacher" parameterType="HashMap">
+ 		UPDATE TEACHER SET
+			TEA_NM_KOR = #{teaNmKor}, TEA_NM_ENG = #{teaNmEng},
+			MAJOR = #{major}, TEA_TITLE = #{teaTitle},
+			TEA_PN = #{teaPn}, TEA_EMAIL = #{teaEmail},
+			TEA_ZIP = #{teaZip}, TEA_ADDR1 = #{teaAddr1}, TEA_ADDR2 = #{teaAddr2},
+			TEA_BANK = #{teaBank}, TEA_ACCOUNT =#{teaAccount},
+			DEPT_NUM = #{deptNum}
+
+		 WHERE TEA_NUM = #{teaNum}
+ 	</update>
+
+ 	<!-- (교수) 교번 자동생성 -->
+	<select id="getTeaNum" resultType="int">
+		SELECT NVL(MAX(TEA_NUM),0)+1 FROM TEACHER
+	</select>
+
+ 	<!-- (교수) 교수 등록 -->
+ 	<insert id="createPost" parameterType="HashMap">
+ 		<selectKey order="BEFORE" keyProperty="teaNum1" resultType="int">
+			SELECT NVL(MAX(TEA_NUM),0)+1 FROM TEACHER
+ 		</selectKey>
+	 		INSERT INTO TEACHER
+			(TEA_NUM, DEPT_NUM, TEA_NM_KOR, TEA_NM_ENG, TEA_PN,
+			 TEA_EMAIL, TEA_REG1, TEA_REG2, TEA_ZIP,
+			 TEA_ADDR1, TEA_ADDR2, MAJOR, TEA_TITLE
+			 )
+			VALUES(#{teaNum1},#{deptNum},#{teaNmKor1},#{teaNmEng1},#{teaPn1}
+			,#{teaEmail1},#{teaReg3},#{teaReg4},#{teaZip1},#{teaAddr3}
+			,#{teaAddr4},#{major1},#{teaTitle1})
+ 	</insert>
+
+ 	<!-- (교수) 교직원 권한 등록 -->
+ 	<insert id="createAuth" parameterType="int">
+		INSERT INTO AUTHENTICATE
+		(USERNAME, AUTH)
+		VALUES
+		((SELECT NVL(MAX(TEA_NUM),0)+1 FROM TEACHER) , 'ROLE_TEA')
+ 	</insert>
+
+ 	<!-- (교수) 교직원 아이디등록 -->
+ 	<insert id="createUsers" parameterType="int">
+	 	INSERT INTO USERS
+	 	(USERNAME, PASSWORD, ENABLED)
+		VALUES
+		((SELECT NVL(MAX(TEA_NUM),0)+1 FROM TEACHER) ,PKG_CRYPTO.ENCRYPT('JAVA'), 1)
+ 	</insert>
+
+ 	<select id="getTeacher" resultType="teacherVO">
+ 		SELECT DISTINCT TEA_TITLE
+		  FROM TEACHER
+ 	</select>
+ 	<!-- (교수) 전체 수  -->
+ 	<select id="total" resultType="int">
+		SELECT COUNT(*)
+		FROM TEACHER
+	</select>
+	<select id="teaTitle" resultType="int">
+		SELECT COUNT(*)
+		FROM TEACHER
+        WHERE TEA_TITLE ='학과장'
+    </select>
+    <select id="totalEmp" resultType="int">
+    	SELECT COUNT(*)
+    	FROM EMPLOYEE
+    </select>
+</mapper>
+

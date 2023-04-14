@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE tiles-definitions PUBLIC 
+"-//Apache Software Foundation//DTD Tiles Configuration 3.0//EN" 
+"http://tiles.apache.org/dtds/tiles-config_3_0.dtd">
+<!-- tiles 설정 -->
+<tiles-definitions>
+	<definition name="login" template="/WEB-INF/views/login/loginIndex.jsp">
+		<put-attribute name="body" value="" />
+	</definition>
+	
+	<definition name="login/*" extends="login">
+		<put-attribute name="body" value="/WEB-INF/views/login/{1}.jsp" />
+	</definition>
+	
+	<definition name="subject" template="/WEB-INF/views/subject/subjectIndex.jsp">
+		<put-attribute name="body" value="" />
+	</definition>
+	
+	<definition name="subject/*" extends="subject">
+		<put-attribute name="body" value="/WEB-INF/views/subject/{1}.jsp" />
+	</definition>
+	
+	<definition name="shopping" template="/WEB-INF/views/shopping/shoppingIndex.jsp">
+		<put-attribute name="body" value="" />
+	</definition>
+	
+	<definition name="shopping/*" extends="shopping">
+		<put-attribute name="body" value="/WEB-INF/views/shopping/{1}.jsp" />
+	</definition>
+
+	<definition name="certificate/files/*" template="/WEB-INF/views/certificate/files/{1}.jsp">
+		<put-attribute name="body" value="" />
+	</definition>
+
+	<!-- main layout -->
+	<definition name="tiles-layout" template="/WEB-INF/views/tiles/index.jsp">
+		<put-attribute name="header" value="/WEB-INF/views/tiles/header.jsp" />
+		<put-attribute name="aside_stu" value="/WEB-INF/views/tiles/aside_stu.jsp" />
+		<put-attribute name="aside_pro" value="/WEB-INF/views/tiles/aside_pro.jsp" />
+		<put-attribute name="aside_adm" value="/WEB-INF/views/tiles/aside_adm.jsp" />
+		<put-attribute name="body" value="" />
+		<put-attribute name="footer" value="/WEB-INF/views/tiles/footer.jsp" />
+	</definition>
+	<!-- name의 */*은 body의 value에서 1과 2에 해당
+		controller에서 forwarding 시 return "1/2";
+		
+		mav.setViewName("book/create");
+	 -->
+	 
+
+	<definition name="*/*" extends="tiles-layout">
+		<put-attribute name="body" value="/WEB-INF/views/{1}/{2}.jsp" />
+	</definition>
+
+	
+	<!-- ///////////////////////////////////////////////////////////// -->
+	
+	<!-- main layout -->
+	<definition name="tiles-layout2" template="/WEB-INF/views/tiles/index.jsp">
+		<put-attribute name="header" value="/WEB-INF/views/tiles/header.jsp" />
+		<put-attribute name="aside_stu" value="/WEB-INF/views/tiles/aside_stu.jsp" />
+		<put-attribute name="aside_pro" value="/WEB-INF/views/tiles/aside_pro.jsp" />
+		<put-attribute name="aside_adm" value="/WEB-INF/views/tiles/aside_adm.jsp" />
+		<put-attribute name="body" value="" />
+		<put-attribute name="footer" value="/WEB-INF/views/tiles/footer.jsp" />
+	</definition>
+	<!-- name의 */*은 body의 value에서 1과 2에 해당
+		controller에서 forwarding 시 return "1/2";
+		
+		mav.setViewName("book/create");
+	 -->
+	<definition name="*" extends="tiles-layout2">
+		<put-attribute name="body" value="/WEB-INF/views/{1}.jsp" />
+	</definition>
+	
+</tiles-definitions>

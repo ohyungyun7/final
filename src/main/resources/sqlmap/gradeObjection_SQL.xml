@@ -1,0 +1,169 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.GradeObjectionMapper">
+
+	<!-- (학생)학생조회 -->
+	<select id="getStuInfo" resultType="stuVO" parameterType="HashMap" >
+     SELECT S.STU_NUM,
+               S.STU_NM_KOR,
+              SUBSTR(MAX(CL.CL_SEMESTER),1,4) || '년' year,
+              SUBSTR(MAX(CL.CL_SEMESTER),6,2) || '학기' CL_SEMESTER
+        FROM COURSE_LIST CL , STUDENT S
+        WHERE CL.STU_NUM = S.STU_NUM
+		   AND S.STU_NUM = #{stuNum}
+		 GROUP BY S.STU_NUM, S.STU_NM_KOR
+	</select>
+
+	<!-- (학생) 내가 수강한 과목 리스트 조회 -->
+	<select id="gradeObjectionList" resultType="courseListVO" parameterType="HashMap">
+		SELECT SUBSTR(T.CL_SEMESTER,1,4) YEARR,
+		       SUBSTR(T.CL_SEMESTER,6,2) GKRRL,
+		       T.SBJ_TITLE ,
+		      T.SBJ_RS,
+		        T.TEA_NM_KOR,
+		        T.SBJ_NUM,
+		        T.GO_CHECK
+		FROM(
+
+		     SELECT   A.CL_SEMESTER,
+		              B.SBJ_TITLE ,
+		                CASE WHEN B.SBJ_RS = 0 THEN '전공필수'
+		                     WHEN B.SBJ_RS = 1 THEN '전공선택'
+		                     WHEN B.SBJ_RS = 2 THEN '교양'
+		                END SBJ_RS,
+		                C.TEA_NM_KOR,
+		                 A.SBJ_NUM,
+	                    CASE WHEN D.GO_CHECK = 0 THEN '대기'
+	                         WHEN D.GO_CHECK = 1 THEN '승인'
+	                         WHEN D.GO_CHECK = 2 THEN '반려'
+	                         WHEN D.GO_CHECK is null THEN '대기'
+	                    END GO_CHECK,
+	                 COUNT(B.SBJ_TITLE) COUNT_TITLE
+	            FROM  COURSE_LIST A, SUBJECT B ,TEACHER C , GRADE_OBJC D
+	            WHERE  A.STU_NUM = #{stuNum}
+	            AND
+	            A.SBJ_NUM = B.SBJ_NUM
+	            AND
+	            B.TEA_NUM = C.TEA_NUM
+	            AND
+	            A.sbj_num = D.sbj_num(+)
+	            AND
+	            A.CL_SEMESTER = (SELECT MAX(CL_SEMESTER) FROM COURSE_LIST WHERE STU_NUM = #{stuNum})
+	            GROUP BY (A.CL_SEMESTER,B.SBJ_TITLE,SBJ_RS,C.TEA_NM_KOR,A.SBJ_NUM,GO_CHECK)
+	            ORDER BY  A.CL_SEMESTER DESC
+	       ) T
+	</select>
+
+
+
+	<!-- (학생) 상세조회 -->
+	<select id="detail" parameterType="HashMap" resultType="reportCardVO">
+		   SELECT B.DEPT_NM ,
+          A.STU_NUM ,
+          CASE WHEN A.STU_SEMESTER=1 THEN '1'
+               WHEN A.STU_SEMESTER=2 THEN '1'
+               WHEN A.STU_SEMESTER=3 THEN '2'
+               WHEN A.STU_SEMESTER=4 THEN '2'
+               WHEN A.STU_SEMESTER=5 THEN '3'
+               WHEN A.STU_SEMESTER=6 THEN '3'
+               WHEN A.STU_SEMESTER=7 THEN '4'
+               WHEN A.STU_SEMESTER=8 THEN '4'
+               ELSE '초과학기'
+               END STU_SEMESTER,
+
+           A.STU_NM_KOR,
+           C.RC_ATTSCORE, C.RC_MTEST, C.RC_FTEST, C.RC_HW, C.RC_ETC, C.RC_FSCORE, D.GO_REASON,
+            D.GO_LIST,D.GO_REPLY , D.SBJ_NUM
+      FROM STUDENT A , DEPARTMENT B , REPORT_CARD C , GRADE_OBJC D
+      WHERE
+      A.DEPT_NUM = B.DEPT_NUM
+      AND
+      A.STU_NUM = C.STU_NUM
+        AND
+        C.SBJ_NUM = D.SBJ_NUM(+)
+      AND
+      A.STU_NUM = #{stuNum}
+      AND
+      C.SBJ_NUM = #{sbjNum}
+	</select>
+
+	<!-- (학생) 성적이의신청 등록 -->
+	<insert id="create" parameterType="HashMap">
+		INSERT INTO GRADE_OBJC
+		(GO_NUM, CL_NUM, SBJ_NUM, STU_NUM, GO_LIST, GO_REASON, GO_DT, GO_CHECK, GO_REPLY)
+		VALUES
+		(SEQ_GRADE_OBJECTION.NEXTVAL, (SELECT CL_NUM
+		                                  FROM COURSE_LIST
+		                                  WHERE STU_NUM = #{stuNum}
+		                                  AND
+		                                  SBJ_NUM = #{sbjNum}) ,#{sbjNum} ,#{stuNum}, #{goList},#{goReason},SYSDATE,0,NULL)
+	</insert>
+
+	<!-- (학생) 성적이의신청 확인 -->
+	<select id="check" parameterType="HashMap" resultType="int">
+		SELECT COUNT(*)
+			FROM GRADE_OBJC
+			WHERE SBJ_NUM = #{sbjNum}
+			AND
+			STU_NUM = #{stuNum}
+			AND CL_NUM = (SELECT CL_NUM
+			                FROM COURSE_LIST
+			                WHERE SBJ_NUM = #{sbjNum}
+			                AND
+			                STU_NUM = #{stuNum})
+	</select>
+
+	<!-- (교수)교수조회 -->
+	<select id="getTeaInfo" resultType="teaVO" parameterType="HashMap">
+		    SELECT T.TEA_NUM,
+                   T.TEA_NM_KOR,
+                   SUBSTR(MAX(CL.CL_SEMESTER),1,4) ||'년' YEAR ,
+                   SUBSTR(MAX(CL.CL_SEMESTER),6,2) ||'학기' CL_SEMESTER
+		  FROM COURSE_LIST CL, SUBJECT S, TEACHER T
+	      WHERE S.TEA_NUM = T.TEA_NUM
+			AND S.SBJ_NUM = CL.SBJ_NUM
+			AND T.TEA_NUM = #{teaNum}
+		  GROUP BY T.TEA_NUM, T.TEA_NM_KOR
+	</select>
+
+	<!-- (교수) 내 과목 성적이의신청 리스트 -->
+	<select id="teacherObjList" resultType="gradeObjectVO" parameterType="HashMap">
+		 SELECT DISTINCT SUBSTR(A.CL_SEMESTER,1,4) YEARR,
+                         SUBSTR(A.CL_SEMESTER,6,2) GKRRL,
+                    CASE WHEN B.SBJ_RS = 0 THEN '전공필수'
+                         WHEN B.SBJ_RS = 1 THEN '전공선택'
+                         WHEN B.SBJ_RS = 2 THEN '교양'
+                     END SBJ_RS,
+                         C.STU_NM_KOR,
+                         B.SBJ_TITLE,
+                         A.SBJ_NUM,
+                         A.STU_NUM,
+                    CASE WHEN D.GO_CHECK=0 THEN '대기'
+                    	 WHEN D.GO_CHECK=1 THEN '승인'
+                    	 WHEN D.GO_CHECK=2 THEN '반려'
+                     END GO_CHECK
+		   FROM COURSE_LIST A, SUBJECT B, STUDENT C, GRADE_OBJC D
+		  WHERE TEA_NUM = #{teaNum}
+		    AND A.SBJ_NUM = B.SBJ_NUM
+		    AND A.STU_NUM = C.STU_NUM
+			AND B.SBJ_NUM = D.SBJ_NUM
+			AND A.CL_SEMESTER = '2023-01'
+	</select>
+
+	<!-- (교수) 성적이의신청 승인,반려 -->
+	<update id="updateState" parameterType="HashMap">
+        UPDATE GRADE_OBJC SET
+			   GO_CHECK = #{goCheck},
+               GO_REPLY = #{goReply}
+			   WHERE STU_NUM = #{stuNum} and SBJ_NUM = #{sbjNum}
+	</update>
+
+	<update id="updateState1" parameterType="HashMap">
+		UPDATE GRADE_OBJC SET
+			   GO_CHECK = #{goCheck},
+			   GO_REPLY = #{goReply}
+			  WHERE STU_NUM = #{stuNum}
+	</update>
+</mapper>

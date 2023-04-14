@@ -1,0 +1,171 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.StudyGeneralMapper">
+	
+	<select id="getStudyList" parameterType="studyVO" resultType="studyVO">
+		SELECT S_NUM, STU_NUM, S_NM, S_GRADE, S_COUNT, 
+		        (SELECT COUNT(*) FROM STUDY WHERE S_NUM = A.S_NUM AND S_GRADE IN (0, 1, -4, -3)) AS stuCount,
+		        TO_CHAR((SELECT S_DT FROM STUDY WHERE S_NUM = A.S_NUM AND S_GRADE IN (1, -3)), 'yyyy.MM.dd') OD
+		FROM STUDY A
+		WHERE STU_NUM = #{stuNum}
+	</select>
+	
+	<select id="getStudy" parameterType="studyVO" resultType="studyVO">
+		SELECT S_NUM, STU_NUM, S_NM, S_DT, S_GRADE, S_COUNT
+		FROM STUDY
+		WHERE S_NUM = #{sNum}
+		AND STU_NUM = #{stuNum}
+	</select>
+	
+	<delete id="deleteStudy" parameterType="studyVO">
+		DELETE FROM STUDY WHERE S_NUM = #{sNum} AND STU_NUM = #{stuNum}
+	</delete>
+	
+	<update id="updateStudy" parameterType="studyVO">
+		UPDATE STUDY 
+		SET S_GRADE = #{sGrade} 
+		<if test="#{sGrade eq 0}">
+			,S_COUNT = (SELECT COUNT(*) FROM STUDY_CHATTING WHERE S_NUM = #{sNum})
+			,S_DT = SYSDATE
+		</if>
+		WHERE S_NUM = #{sNum} AND STU_NUM = #{stuNum}
+	</update>
+	
+	<insert id="insertStudy" parameterType="studyVO">
+		INSERT INTO STUDY(S_NUM, STU_NUM, S_NM, S_GRADE)
+		VALUES(#{sNum}, #{stuNum}, #{sNm}, #{sGrade})
+	</insert>
+	
+	<select id="getStudentList" parameterType="studyVO" resultType="hashMap">
+		SELECT A.STU_NUM, A.S_DT, A.S_GRADE, B.STU_NM_KOR
+		FROM STUDY A, STUDENT B
+		WHERE A.STU_NUM = B.STU_NUM
+		AND A.S_NUM = #{sNum}
+	</select>
+	
+	<select id="inviteList" parameterType="int" resultType="hashMap">
+		SELECT A.STU_NUM, A.STU_NM_KOR, #{sNum} AS S_NUM
+		FROM STUDENT A
+		WHERE NOT EXISTS (SELECT 1
+		                    FROM STUDY B
+		                   WHERE B.STU_NUM = A.STU_NUM
+		                     AND B.S_NUM = #{sNum})
+	</select>
+
+	<insert id="reportStudy" parameterType="studyreportvo">
+		INSERT INTO STUDY_REPORT_LIST(SRL_NUM, S_NUM, STU_NUM, SRL_REASON)
+		VALUES(SEQ_STUDY_REPORT_LIST.NEXTVAL, #{sNum}, #{stuNum}, #{srlReason})
+	</insert>
+	
+	<select id="wholeStudyList" parameterType="int" resultType="hashMap">
+		WITH T AS(
+		        SELECT S_NUM, S_NM, COUNT(*) AS COUNT
+		        FROM STUDY
+		        WHERE S_NUM NOT IN(SELECT S_NUM FROM STUDY 
+		        					WHERE STU_NUM = #{stuNum})
+		        GROUP BY S_NUM, S_NM
+		        ORDER BY 1
+		)
+		SELECT T.S_NUM, T.S_NM, T.COUNT, A.STU_NUM, B.STU_NM_KOR
+		FROM T, STUDY A, STUDENT B
+		WHERE A.S_GRADE = 1
+		AND A.S_NUM = T.S_NUM
+		AND A.STU_NUM = B.STU_NUM
+		ORDER BY 1
+	</select>
+	
+	<select id="studentList" resultType="hashMap">
+		SELECT STU_NUM, STU_NM_KOR
+		FROM STUDENT
+	</select>
+	
+	<insert id="openStudy">
+		<selectKey resultType="int" order="BEFORE" keyProperty="sNum">
+			SELECT SEQ_STUDY.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO STUDY(S_NUM, STU_NUM, S_NM, S_GRADE)
+		VALUES(#{sNum}, #{stuNum}, #{sNm}, #{sGrade})
+	</insert>
+	
+	<select id="reportedStudyList" resultType="hashMap">
+		WITH T AS(
+		        SELECT DISTINCT S_NUM, S_NM, (SELECT COUNT(*) FROM STUDY_REPORT_LIST R WHERE S.S_NUM = R.S_NUM)  AS COUNT
+		        FROM STUDY S
+		        ORDER BY 3
+		)
+		SELECT T.S_NUM, T.S_NM, T.COUNT, A.STU_NUM, B.STU_NM_KOR
+		FROM T, STUDY A, STUDENT B
+		WHERE T.COUNT > 0
+		AND A.S_GRADE = 1
+		AND A.S_NUM = T.S_NUM
+		AND A.STU_NUM = B.STU_NUM
+	</select>
+	
+	<select id="banStudyList" resultType="hashMap">
+		WITH T AS(
+		        SELECT S_NUM, S_NM, COUNT(*) AS COUNT
+		        FROM STUDY
+		        WHERE S_GRADE IN(-4, -3)
+		        GROUP BY S_NUM, S_NM
+		        ORDER BY 1
+		)
+		SELECT T.S_NUM, T.S_NM, T.COUNT, A.STU_NUM, B.STU_NM_KOR
+		FROM T, STUDY A, STUDENT B
+		WHERE A.S_GRADE = -3
+		AND A.S_NUM = T.S_NUM
+		AND A.STU_NUM = B.STU_NUM
+		ORDER BY 1
+	</select>
+
+	<update id="manageReportStudy" parameterType="studyVO">
+		UPDATE STUDY SET S_GRADE = S_GRADE + #{sGrade}
+		WHERE S_NUM = #{sNum}
+	</update>
+
+	<select id="afterBanCancel" parameterType="studyVO" resultType="hashMap">
+		WITH T AS(
+		        SELECT DISTINCT S_NUM, S_NM, (SELECT COUNT(*) FROM STUDY_REPORT_LIST R WHERE S.S_NUM = R.S_NUM)  AS COUNT
+		        FROM STUDY S
+		        ORDER BY 1
+		)
+		SELECT T.S_NUM, T.S_NM, T.COUNT, A.STU_NUM, B.STU_NM_KOR
+		FROM T, STUDY A, STUDENT B
+		WHERE A.S_GRADE = 1
+		AND A.S_NUM = #{sNum}
+		AND A.S_NUM = T.S_NUM
+		AND A.STU_NUM = B.STU_NUM
+		ORDER BY 1
+	</select>
+	
+	<select id="banStudyOne" resultType="hashMap">
+		WITH T AS(
+		        SELECT S_NUM, S_NM, COUNT(*) AS COUNT
+		        FROM STUDY
+		        WHERE S_GRADE IN(-4, -3)
+		        GROUP BY S_NUM, S_NM
+		        ORDER BY 1
+		)
+		SELECT T.S_NUM, T.S_NM, T.COUNT, A.STU_NUM, B.STU_NM_KOR
+		FROM T, STUDY A, STUDENT B
+		WHERE A.S_GRADE = -3
+		AND A.S_NUM = #{sNum}
+		AND A.S_NUM = T.S_NUM
+		AND A.STU_NUM = B.STU_NUM
+		ORDER BY 1
+	</select>
+	
+	<delete id="deleteHistory" parameterType="studyVO">
+		DELETE FROM STUDY_REPORT_LIST WHERE S_NUM = #{sNum}
+	</delete>
+	
+	<select id="getReasonList" parameterType="int" resultType="hashMap">
+		SELECT SRL_NUM, S_NUM, STU_NUM, SRL_REASON, 
+			   (SELECT STU_NM_KOR FROM STUDENT B WHERE A.STU_NUM = B.STU_NUM) AS STU_NM_KOR
+		FROM STUDY_REPORT_LIST A
+		WHERE S_NUM = #{sNum}
+	</select>
+	
+</mapper>
+

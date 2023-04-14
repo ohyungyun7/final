@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.CmMapper">
+	
+	<select id="getAll" resultType="subjectvo">
+		SELECT SBJ_NUM, DEPT_NUM, TEA_NUM, SBJ_TITLE, SBJ_GRADE, SBJ_RECODE, SBJ_PERSONNEL, SBJ_YN, SBJ_COMRE, SBJ_OC, SBJ_RS, CURRENT_DATA
+		FROM SUBJECT
+		ORDER BY SBJ_YN, SBJ_OC, DEPT_NUM, SBJ_GRADE, SBJ_NUM
+	</select>
+	
+	<update id="approval" parameterType="string">
+		update SUBJECT set sbj_oc= 1 
+		where sbj_num = #{sbjNum}
+	</update>
+
+	<update id="declined" parameterType="string">
+		update SUBJECT set sbj_oc= 0
+		where sbj_num = #{sbjNum}
+	</update>
+
+	<update id="closed" parameterType="string">
+		update SUBJECT set sbj_oc= 2
+		where sbj_num = #{sbjNum}
+	</update>
+
+
+</mapper>

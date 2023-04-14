@@ -1,0 +1,203 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.mapper.TuitionMapper">
+<!-- year=null, tpYn=null, semester=null -->
+	<sql id="where">
+  		<if test="year!=null and year!=''">
+			AND   (T.TP_YEAR   LIKE '%' || #{year} || '%')
+		</if>
+		<if test="semester!=null and semester!=''">
+			AND   (T.TP_SEMESTER   LIKE '%' || #{semester} || '%')
+		</if>
+		<if test="tpYn!=null and tpYn!=''">
+			AND   (T.TP_YN   LIKE '%' || #{tpYn} || '%')
+		</if>
+  	</sql>
+
+  	<sql id="where2">
+		<if test="tpYn!=null and tpYn!=''">
+			AND   (T.TP_YN  = #{tpYn})
+		</if>
+  	</sql>
+
+	<!-- 학생 등록금 조회 -->
+	<select id="stuTuitionList" resultType="tuitionVO" parameterType="HashMap">
+<!-- 	   SELECT A.TP_NUM, A.STU_NUM, TO_CHAR(A.TP_DT, 'YYYY-MM-DD') TP_DT, A.TP_AMT,D.SL_AMT, -->
+<!--               SUBSTR(A.TP_SEMESTER,1,4) ||'년 ' TP_YEAR,  SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER, -->
+<!-- 	          CASE WHEN A.TP_YN = 0 THEN '미납' -->
+<!-- 	               WHEN A.TP_YN = 1 THEN '완납' -->
+<!-- 	      END TP_YN, -->
+<!-- 	      A.TP_AMT - D.SL_AMT TOTAL -->
+<!-- 		 FROM TUITION_PAY A, STUDENT B, SCHOLARSHIP_REDETAIL C, SCHOLARSHIP_LIST D -->
+<!-- 		WHERE A.STU_NUM = B.STU_NUM -->
+<!-- 		  AND B.STU_NUM = C.STU_NUM -->
+<!-- 		  AND C.SL_NUM = D.SL_NUM -->
+<!-- 		  AND A.STU_NUM = #{stuNum} -->
+
+
+			SELECT DISTINCT(A.TP_NUM) , A.STU_NUM , A.TP_DT , A.TP_AMT ,
+	      CASE WHEN B.SL_AMT IS NULL THEN 0
+	          ELSE B.SL_AMT
+	          END SL_AMT,
+	      SUBSTR(A.TP_SEMESTER,1,4) ||'년 ' TP_YEAR,
+	      SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER,
+	      A.TP_YN,
+	      CASE WHEN A.TP_AMT - SL_AMT IS NULL THEN A.TP_AMT
+	          ELSE A.TP_AMT - SL_AMT
+	          END TOTAL
+
+		FROM TUITION_PAY A , (
+		                        SELECT E.SR_NUM, E.STU_NUM ,E.SR_SEMESTER ,E.SR_DATE, F.SL_NM, SL_AMT
+		                          FROM SCHOLARSHIP_REDETAIL E , SCHOLARSHIP_LIST F
+		                         WHERE E.SL_NUM = F.SL_NUM) B
+		WHERE
+		A.TP_SEMESTER = B.SR_SEMESTER(+)
+		AND
+		A.STU_NUM = #{stuNum}
+		ORDER BY TP_DT DESC
+	</select>
+
+	<select id="admTuitionList" resultType="tuitionVO" parameterType="HashMap">
+<!--     	WITH T AS( -->
+<!-- 		SELECT ROW_NUMBER() OVER(ORDER BY TP_NUM DESC) RNUM, -->
+<!--            SUBSTR(A.TP_SEMESTER,1,4) ||'년' TP_YEAR, -->
+<!-- 	       SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER, -->
+<!-- 	       C.DEPT_NM, B.STU_NM_KOR, -->
+<!-- 	       A.STU_NUM, -->
+<!-- 	       A.TP_YN, -->
+<!-- 	       B.STU_PN -->
+<!-- 		FROM TUITION_PAY A, STUDENT B, DEPARTMENT C -->
+<!-- 		WHERE A.STU_NUM = B.STU_NUM -->
+<!-- 		AND B.DEPT_NUM = C.DEPT_NUM -->
+<!-- 		ORDER BY TP_YEAR DESC -->
+<!--        ) -->
+<!--         SELECT T.RNUM, T.TP_YEAR, T.TP_SEMESTER, T.DEPT_NM, T.STU_NM_KOR, T.STU_NUM, T.TP_YN , T.STU_PN -->
+<!--         FROM T -->
+<!--       	WHERE T.RNUM BETWEEN (#{currentPage} * #{size}) - (#{size} - 1) and (#{currentPage} * #{size}) -->
+<!--       	<include refid="where"/> -->
+<!--     	 ORDER BY TP_YEAR DESC, TP_SEMESTER DESC -->
+
+ <![CDATA[
+			WITH T AS(
+			        SELECT ROW_NUMBER() OVER(ORDER BY U.TP_YEAR DESC, U.TP_SEMESTER ASC,U.TP_YN ASC) RNUM, U.TP_YEAR,U.TP_SEMESTER,U.DEPT_NM, U.STU_NM_KOR,
+				       U.STU_NUM, U.TP_YN, U.STU_PN
+			        FROM
+			        (
+			            SELECT SUBSTR(A.TP_SEMESTER,1,4) ||'년' TP_YEAR,
+			               SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER,
+			               C.DEPT_NM, B.STU_NM_KOR,
+			               A.STU_NUM,
+			               A.TP_YN,
+			               B.STU_PN
+			            FROM TUITION_PAY A, STUDENT B, DEPARTMENT C
+			            WHERE A.STU_NUM = B.STU_NUM
+			            AND B.DEPT_NUM = C.DEPT_NUM
+			            AND SUBSTR(A.TP_SEMESTER,1,4) = TO_CHAR(SYSDATE,'YYYY')
+			            UNION ALL
+			            SELECT SUBSTR(A.TP_SEMESTER,1,4) ||'년' TP_YEAR,
+			               SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER,
+			               C.DEPT_NM, B.STU_NM_KOR,
+			               A.STU_NUM,
+			               A.TP_YN,
+			               B.STU_PN
+			            FROM TUITION_PAY A, STUDENT B, DEPARTMENT C
+			            WHERE A.STU_NUM = B.STU_NUM
+			            AND B.DEPT_NUM = C.DEPT_NUM
+			            AND SUBSTR(A.TP_SEMESTER,1,4) < TO_CHAR(SYSDATE,'YYYY')
+			        ) U
+			)
+			SELECT T.RNUM, T.TP_YEAR, T.TP_SEMESTER, T.DEPT_NM, T.STU_NM_KOR, T.STU_NUM, T.TP_YN , T.STU_PN
+			FROM T
+				WHERE T.RNUM BETWEEN (#{currentPage} * #{size}) - (#{size} - 1) and (#{currentPage} * #{size})
+
+]]>
+
+
+	</select>
+
+	<select id="tuitionNum" resultType="tuitionVO" parameterType="HashMap">
+<!-- 		SELECT C.DEPT_NM, A.STU_NUM, B.STU_NM_KOR, B.STU_PN -->
+<!-- 		  FROM TUITION_PAY A, STUDENT B, DEPARTMENT C -->
+<!-- 		 WHERE A.STU_NUM = B.STU_NUM -->
+<!-- 		   AND B.DEPT_NUM = C.DEPT_NUM -->
+<!-- 		   AND B.STU_NUM = #{stuNum} -->
+		   SELECT C.DEPT_NM, A.STU_NUM, B.STU_NM_KOR, B.STU_PN
+		  FROM TUITION_PAY A, STUDENT B, DEPARTMENT C
+		 WHERE A.STU_NUM = B.STU_NUM
+		   AND B.DEPT_NUM = C.DEPT_NUM
+		   AND B.STU_NUM = #{stuNum}
+           AND A.TP_SEMESTER  LIKE '%2023-01%'
+
+
+	</select>
+
+	<!-- 전체 행의 수(total). -->
+	<select id="getTotal" resultType="int" parameterType="hashMap">
+        WITH T AS(
+                SELECT ROW_NUMBER() OVER(ORDER BY TP_NUM DESC) RNUM,
+                 SUBSTR(A.TP_SEMESTER,1,4) ||'년' TP_YEAR,
+                 SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER,
+                 C.DEPT_NM, B.STU_NM_KOR,
+                 A.STU_NUM,
+                 A.TP_YN,
+                 B.STU_PN
+              FROM TUITION_PAY A, STUDENT B, DEPARTMENT C
+              WHERE A.STU_NUM = B.STU_NUM
+              AND B.DEPT_NUM = C.DEPT_NUM
+              ORDER BY TP_YEAR
+	    )
+	    SELECT COUNT(*) TOTAL
+	    FROM   T
+	    WHERE  1 = 1
+	    <include refid="where"/>
+	</select>
+
+
+	<select id="getTuitionYear" resultType="courseListVO">
+		SELECT DISTINCT(SUBSTR(CL_SEMESTER,1,4)) CL_SEMESTER
+		FROM COURSE_LIST
+		ORDER BY CL_SEMESTER DESC
+	</select>
+
+	<select id="checkRnum" parameterType="hashMap" resultType="int">
+		  WITH T AS(
+                SELECT ROW_NUMBER() OVER(ORDER BY TP_NUM DESC) RNUM,
+                 SUBSTR(A.TP_SEMESTER,1,4) ||'년' TP_YEAR,
+                 SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER,
+                 C.DEPT_NM, B.STU_NM_KOR,
+                 A.STU_NUM,
+                 A.TP_YN,
+                 B.STU_PN
+              FROM TUITION_PAY A, STUDENT B, DEPARTMENT C
+              WHERE A.STU_NUM = B.STU_NUM
+              AND B.DEPT_NUM = C.DEPT_NUM
+              ORDER BY TP_YEAR
+	    )
+	    SELECT MAX(T.RNUM)
+	    FROM   T
+	    WHERE  1 = 1
+       	<include refid="where2"/>
+	</select>
+
+	<select id="admTuitionList2" resultType="tuitionVO" parameterType="HashMap">
+		WITH T AS(
+			SELECT ROW_NUMBER() OVER(ORDER BY TP_NUM DESC) RNUM,
+	           SUBSTR(A.TP_SEMESTER,1,4) ||'년' TP_YEAR,
+		       SUBSTR(A.TP_SEMESTER,6,6) ||'학기' TP_SEMESTER,
+		       C.DEPT_NM, B.STU_NM_KOR,
+		       A.STU_NUM,
+		       A.TP_YN,
+		       B.STU_PN
+			FROM TUITION_PAY A, STUDENT B, DEPARTMENT C
+			WHERE A.STU_NUM = B.STU_NUM
+			AND B.DEPT_NUM = C.DEPT_NUM
+			ORDER BY TP_YEAR
+	       )
+	        SELECT T.RNUM, T.TP_YEAR, T.TP_SEMESTER, T.DEPT_NM, T.STU_NM_KOR, T.STU_NUM, T.TP_YN , T.STU_PN
+	        FROM T
+	      	WHERE 1=1
+	      	<include refid="where"/>
+	    	 ORDER BY TP_YEAR DESC, TP_SEMESTER DESC
+	</select>
+</mapper>

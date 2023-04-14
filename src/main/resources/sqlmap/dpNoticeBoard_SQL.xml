@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+  <mapper namespace="kr.or.ddit.mapper.DPNoticeBoardMapper">
+
+  	<select id="getDnNum" resultType="int">
+  		SELECT NVL(MAX(DN_NUM),0) + 1 FROM DEPARTMENT_NOTE
+  	</select>
+
+  	<insert id="createPost" parameterType="dnVO">
+  		INSERT INTO DEPARTMENT_NOTE(DN_NUM, TEA_NUM, DN_TITLE, DN_CONTENT, DN_DT, DN_READ, DEPT_NUM)
+  		VALUES (#{dnNum}, #{teaNum}, #{dnTitle}, #{dnContent}, SYSDATE, #{dnRead}, #{deptNum})
+  	</insert>
+
+ 	 <update id="createPostFiles" parameterType="java.util.List">
+ 	 	<selectKey resultType="int" order="BEFORE" keyProperty="dfNum">
+ 	 		SELECT NVL(MAX(DF_NUM),0) + 1 FROM DEPARTMENT_FILE
+ 	 	</selectKey>
+ 	 	<foreach collection="list" item="dfVO"
+ 	 			 open="insert all" close="select * from dual" separator=" " index="idx">
+ 	 		INTO DEPARTMENT_FILE(DF_NUM, DE_NUM, DF_NM)
+ 	 		VALUES(#{idx}+#{dfNum}, #{dfVO.deNum}, #{dfVO.dfNm})
+	 	</foreach>
+ 	 </update>
+
+
+  	<sql id="boardSearch">
+		<if test="category=='all' and keyword!=null and keyword!=''">
+			and(
+				   DN_TITLE LIKE '%' || #{keyword} || '%'
+				OR DN_CONTENT LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+		<if test="category=='title' and keyword!=null and keyword!=''">
+			and(
+				   DN_TITLE LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+		<if test="category=='content' and keyword!=null and keyword!=''">
+			and(
+				   DN_CONTENT LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+ 	</sql>
+
+
+
+ 	 <select id="getTotal" parameterType="hashMap" resultType="int">
+ 	 	SELECT COUNT(*) FROM DEPARTMENT_NOTE
+ 	 	WHERE DEPT_NUM = #{deptNum}
+ 	 	<include refid="boardSearch" />
+ 	 </select>
+
+	<select id="getDPNoticeList" parameterType="hashMap" resultType="dnVO">
+		WITH U AS(
+		    SELECT ROW_NUMBER() OVER (ORDER BY  C.DN_READ DESC) RNUM, C.*
+		    FROM(
+		            SELECT B.TEA_NM_KOR AS name,
+		                   A.DN_NUM DN_NUM, A.TEA_NUM, A.DN_TITLE, A.DN_DT, A.DN_HIT, A.DN_READ, A.DEPT_NUM
+		            FROM TEACHER B LEFT OUTER JOIN (
+		                                            SELECT DN_NUM, TEA_NUM, DN_TITLE, DN_DT, DN_HIT, DN_READ, DEPT_NUM
+		                                            FROM DEPARTMENT_NOTE
+		                                            WHERE DEPT_NUM = #{deptNum}
+		                                            <include refid="boardSearch"  />
+		                                            ) A
+		            ON(B.TEA_NUM = A.TEA_NUM)
+		            WHERE B.DEPT_NUM = A.DEPT_NUM
+		            ORDER BY A.DN_DT DESC) C
+		)
+		SELECT U.*
+		FROM U
+		WHERE u.rnum between (#{currentPage} * #{size}) - (#{size} - 1) and #{currentPage} * #{size}
+	</select>
+
+	<select id="mainDPNoticeList" parameterType="int" resultType="dnVO">
+		SELECT T.*
+        FROM (
+                SELECT ROW_NUMBER() OVER (ORDER BY  B.DN_DT DESC) RNUM,
+                        DN_NUM, TEA_NUM, DN_TITLE, DN_CONTENT, DN_DT, DN_HIT,
+                        (SELECT TEA_NM_KOR FROM TEACHER A WHERE A.TEA_NUM = B.TEA_NUM) AS name
+                    FROM DEPARTMENT_NOTE B
+                    WHERE B.DEPT_NUM = #{data}
+               ) T
+        WHERE RNUM BETWEEN 1 AND 3
+	</select>
+
+  	<update id="upHit" parameterType="int">
+  		UPDATE DEPARTMENT_NOTE SET DN_HIT = DN_HIT + 1 WHERE DN_NUM = #{data}
+  	</update>
+
+
+
+ 	<resultMap type="dnVO" id="noteMap">
+ 		<result property="dnNum" column="DN_NUM" />
+ 		<result property="teaNum" column="TEA_NUM" />
+ 		<result property="dnTitle" column="DN_TITLE" />
+ 		<result property="dnContent" column="DN_CONTENT" />
+ 		<result property="dnDt" column="DN_DT" />
+ 		<result property="dnHit" column="DN_HIT" />
+ 		<result property="dnRead" column="DN_READ" />
+ 		<result property="deptNum" column="DEPT_NUM" />
+ 		<result property="name" column="TEA_NM_KOR" />
+ 		<collection property="dfVOList" resultMap="fileMap"></collection>
+ 	</resultMap>
+
+ 	<resultMap type="dfVO" id="fileMap">
+ 		<result property="dfNum" column="DF_NUM" />
+ 		<result property="deNum" column="DE_NUM" />
+ 		<result property="dfNm" column="DF_NM" />
+ 	</resultMap>
+
+  	<select id="detail" parameterType="int" resultMap="noteMap">
+		SELECT D.TEA_NM_KOR, C.*
+		FROM TEACHER D LEFT OUTER JOIN (
+		                            SELECT A.DN_NUM, A.TEA_NUM AS TEA_NUM, A.DN_TITLE, A.DN_CONTENT, A.DN_DT, A.DN_HIT, A.DN_READ, A.DEPT_NUM,
+		                                   B.DF_NUM, B.DE_NUM, B.DF_NM
+		                            FROM DEPARTMENT_NOTE A LEFT OUTER JOIN DEPARTMENT_FILE B
+		                            ON(A.DN_NUM = B.DE_NUM)
+		                            WHERE A.DN_NUM = #{data}) C
+		ON(D.TEA_NUM = C.TEA_NUM)
+		WHERE C.DN_NUM = #{data}
+  	</select>
+
+  	<delete id="deleteDF" parameterType="int">
+  		DELETE FROM DEPARTMENT_FILE
+  		WHERE DE_NUM = #{data}
+  	</delete>
+
+  	<delete id="deleteDN" parameterType="int">
+  		DELETE FROM DEPARTMENT_NOTE
+  		WHERE DN_NUM = #{data}
+  	</delete>
+
+  	<delete id="deleteFile" parameterType="int">
+  		DELETE FROM DEPARTMENT_FILE
+  		WHERE DF_NUM = #{data}
+  	</delete>
+
+  	<update id="updatePost" parameterType="dnVO">
+  		UPDATE DEPARTMENT_NOTE SET
+  				DN_TITLE = #{dnTitle}, DN_CONTENT = #{dnContent}, DN_DT = SYSDATE, DN_READ = #{dnRead}
+  		WHERE DN_NUM = #{dnNum}
+  	</update>
+
+  	<select id="getTeachers" parameterType="int" resultType="teaVO">
+  		SELECT TEA_NM_KOR, TEA_NM_ENG, TEA_PN,
+  			   TEA_EMAIL, TEA_PHOTO, MAJOR, TEA_LNUM, TEA_LNM,
+  			   TEA_NATION, TEA_TITLE
+  		FROM TEACHER
+  		WHERE DEPT_NUM = #{data}
+  	</select>
+
+  	<select id="getSubjects" parameterType="int" resultType="subjectVO">
+  		SELECT SBJ_TITLE, SBJ_GRADE, SBJ_RS
+  		FROM SUBJECT
+  		WHERE DEPT_NUM = #{data}
+  			  AND SBJ_YN = 1
+  	</select>
+
+  </mapper>

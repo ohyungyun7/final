@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- namespace : xml파일이 여러개일 수 있으므로 
+	이를 구별하기 위한 식별 용도로 사용
+-->
+<mapper namespace="kr.or.ddit.mapper.StudyChatMapper">
+
+	<!-- 전체 채팅 리스트 -->
+	<select id="getChatList" parameterType="studyChatVO" resultType="studyChatVO">
+		SELECT ROWNUM AS SC_NUM, A.STU_NUM, A.STU_NM_KOR, A.SC_TITLE, TO_CHAR(A.SC_SENDDT, 'PM HH12:MI') SC_SENDDT
+		FROM (SELECT SC_NUM, NVL(STU_NUM, -1) STU_NUM, (SELECT STU_NM_KOR FROM STUDENT B WHERE B.STU_NUM = A.STU_NUM) STU_NM_KOR,
+		                SC_TITLE, SC_SENDDT, S_NUM
+		        FROM STUDY_CHATTING A
+		        WHERE S_NUM = #{sNum}
+<![CDATA[	      AND SC_SENDDT > (SELECT S_DT FROM STUDY WHERE STU_NUM = #{stuNum} AND S_NUM = #{sNum}) ]]>
+		        ORDER BY SC_NUM) A
+		WHERE A.S_NUM = #{sNum}
+	</select>
+	
+	<!-- 채팅 카운트 -->
+	<select id="readCount" parameterType="studyChatVO" resultType="readCountVO">
+		SELECT COUNT(*) PLUS, S_COUNT
+		FROM STUDY
+		WHERE S_NUM = #{sNum}
+<![CDATA[ AND S_GRADE < 2]]>
+		GROUP BY S_COUNT
+		ORDER BY S_COUNT ASC
+	</select>
+	
+	<!-- 채팅 알람 개수 -->
+	<select id="getMsgCount" parameterType="studyChatVO" resultType="int">
+		SELECT (A.ALLCOUNT - B.S_COUNT)
+		FROM (SELECT COUNT(*) ALLCOUNT FROM STUDY_CHATTING WHERE S_NUM = #{sNum}) A,
+		     (SELECT S_COUNT FROM STUDY WHERE STU_NUM = #{stuNum} AND S_NUM = #{sNum}) B
+	</select>
+
+	<!-- 채팅 읽으면 읽은 수 update -->
+	<update id="updateLast" parameterType="studyChatVO">
+		UPDATE STUDY 
+		SET S_COUNT = (SELECT COUNT(*)
+		                FROM STUDY_CHATTING WHERE S_NUM = #{sNum})
+		WHERE STU_NUM = #{stuNum}
+		AND S_NUM = #{sNum}
+	</update>
+
+	<!-- 채팅 insert -->
+	<insert id="insertChat" parameterType="studyChatVO">
+		<selectKey resultType="int" order="BEFORE" keyProperty="scNum">
+			SELECT SEQ_STUDY_CHATTING.NEXTVAL FROM DUAL
+		</selectKey>
+		INSERT INTO STUDY_CHATTING(SC_NUM, S_NUM, STU_NUM, SC_TITLE)
+		VALUES(#{scNum}, #{sNum}, #{stuNum}, #{scTitle})
+	</insert>
+
+	<select id="getStuCount" parameterType="int" resultType="int">
+	<![CDATA[	
+		SELECT COUNT(*) FROM STUDY WHERE S_NUM = #{sNum} AND S_GRADE < 2
+	]]>
+	</select>
+	
+	<select id="getScNumAsRowNum" parameterType="studyChatVO" resultType="int">
+		SELECT RN 
+		FROM (SELECT ROWNUM RN, SC_NUM FROM STUDY_CHATTING WHERE S_NUM = #{sNum} ORDER BY SC_NUM) 
+		WHERE SC_NUM = #{scNum}
+	</select>
+</mapper>

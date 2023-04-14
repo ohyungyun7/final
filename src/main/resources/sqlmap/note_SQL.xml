@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.MessageMapper">
+
+	<select id="getNoteList" parameterType="uservo" resultType="notevo">
+		SELECT NOTE_NUM, NOTE_SEND, SEND_NM, NOTE_REV, REV_NM, NOTE_TITLE, NOTE_CONTENT, NOTE_DT, NOTE_STATUS  
+		FROM NOTE
+		WHERE NOTE_REV = #{username} OR NOTE_SEND = #{username}
+		ORDER BY NOTE_DT DESC
+	</select>
+
+	<select id="unReadMsgCount" resultType="int">
+		SELECT count(*) 
+		FROM NOTE
+		WHERE NOTE_REV = #{username} AND NOTE_STATUS = 0
+	</select>
+	
+	<select id="sendMsgCount" resultType="int">
+		SELECT count(*) 
+		FROM NOTE
+		WHERE NOTE_SEND = #{username}
+	</select>
+	
+	<select id="revMsgCount" parameterType="uservo" resultType="int">
+		SELECT count(*) 
+		FROM NOTE
+		WHERE NOTE_REV = #{username}
+	</select>
+	
+	<select id="totalCount" parameterType="uservo" resultType="int">
+		SELECT count(*) 
+		FROM NOTE
+		WHERE NOTE_REV = #{username} OR NOTE_SEND = #{username}
+	</select>
+	
+	<select id="stuList" resultType="studentvo">
+		SELECT 
+			STU_NUM, DEPT_NUM, STU_NM_KOR, STU_NM_ENG, 
+			STU_REG1, STU_REG2, STU_EMAIL, STU_PN, STU_PHOTO, STU_MS, STU_HDC, 
+			STU_NATION, STU_ZIP, STU_ADDR1, STU_ADDR2, STU_MINOR, STU_DMAJOR, STU_BANK, STU_ACCOUNT, STU_STATUS, STU_SEMESTER 
+		 FROM STUDENT
+		 WHERE STU_STATUS = 0 OR STU_STATUS = 1 OR STU_STATUS = 5
+	</select>
+	
+	<select id="teaList" resultType="teachervo">
+		SELECT 
+			TEA_NUM, DEPT_NUM, TEA_NM_KOR, TEA_NM_ENG, TEA_PN, 
+			TEA_REG1, TEA_REG2, TEA_EMAIL, TEA_PHOTO, TEA_ZIP, TEA_ADDR1, TEA_ADDR2, MAJOR, TEA_LNUM, 
+			TEA_LNM, TEA_NATION, TEA_TITLE, TEA_BANK, TEA_ACCOUNT, TEA_HDC
+		 FROM TEACHER
+	</select>
+	
+	<select id="empList" resultType="adminvo">
+		SELECT 
+			EMP_NUM, EMP_NM_KOR, EMP_NM_ENG, EMP_PHOTO, EMP_PN, EMP_EMAIL, 
+			EMP_REG1, EMP_REG2, EMP_NATION, EMP_ZIP, EMP_ADDR1, EMP_ADDR2, EMP_GROUP, EMP_DP, EMP_TITLE, EMP_MS, EMP_HDC, EMP_BANK, EMP_ACCOUNT
+		 FROM EMPLOYEE
+	</select>
+	
+	<select id="insertMsg" parameterType="notevo" >
+		INSERT INTO NOTE(NOTE_NUM, NOTE_SEND, SEND_NM, NOTE_REV, REV_NM, NOTE_TITLE, NOTE_CONTENT, NOTE_DT, NOTE_STATUS)
+		VALUES(
+		(SELECT MAX(NOTE_NUM)+1 FROM NOTE)
+		,#{noteSend},#{sendNm},#{noteRev}
+		,(
+		    SELECT NM FROM (
+		    SELECT STU_NUM AS NUM, STU_NM_KOR AS NM FROM STUDENT
+		    UNION
+		    SELECT TEA_NUM, TEA_NM_KOR FROM TEACHER
+		    UNION
+		    SELECT EMP_NUM, EMP_NM_KOR FROM EMPLOYEE
+		    )
+		    WHERE NUM = #{noteRev}
+		)
+		,#{noteTitle},#{noteContent},SYSDATE,#{noteStatus})
+	</select>
+
+	<select id="getNote" parameterType="notevo" resultType="notevo">
+		SELECT N.NOTE_NUM, N.NOTE_SEND, N.SEND_NM, N.NOTE_REV, N.REV_NM, N.NOTE_TITLE, N.NOTE_CONTENT, N.NOTE_DT, N.NOTE_STATUS, S.PHOTO
+		FROM NOTE N,  (
+				    SELECT STU_NUM AS NUM, STU_photo AS photo FROM STUDENT
+				    UNION
+				    SELECT TEA_NUM, TEA_photo FROM TEACHER
+				    UNION
+				    SELECT EMP_NUM, EMP_photo FROM EMPLOYEE
+				    ) S
+		WHERE N.NOTE_SEND = S.NUM AND NOTE_NUM = #{noteNum}
+	</select>
+	
+	<update id="reading" parameterType="notevo" >
+		UPDATE NOTE
+		SET NOTE_STATUS = 1
+		WHERE NOTE_NUM = #{noteNum}
+	</update>
+	
+	<select id="unreadList" parameterType="int" resultType="notevo">
+		SELECT N.NOTE_NUM, N.NOTE_SEND, N.SEND_NM, N.NOTE_REV, N.REV_NM, N.NOTE_TITLE, N.NOTE_CONTENT, N.NOTE_DT, N.NOTE_STATUS, S.PHOTO
+		FROM NOTE N, (
+				    SELECT STU_NUM AS NUM, STU_photo AS photo FROM STUDENT
+				    UNION
+				    SELECT TEA_NUM, TEA_photo FROM TEACHER
+				    UNION
+				    SELECT EMP_NUM, EMP_photo FROM EMPLOYEE
+				    ) S
+		WHERE N.NOTE_SEND = S.NUM AND NOTE_REV = #{username} AND NOTE_STATUS = 0
+		ORDER BY NOTE_DT DESC
+	</select>
+	
+	<select id="revList" parameterType="int" resultType="notevo">
+		SELECT N.NOTE_NUM, N.NOTE_SEND, N.SEND_NM, N.NOTE_REV, N.REV_NM, N.NOTE_TITLE, N.NOTE_CONTENT, N.NOTE_DT, N.NOTE_STATUS,
+		        S.PHOTO
+		FROM NOTE N, (
+				    SELECT STU_NUM AS NUM, STU_PHOTO AS PHOTO FROM STUDENT
+				    UNION
+				    SELECT TEA_NUM, TEA_PHOTO FROM TEACHER
+				    UNION
+				    SELECT EMP_NUM, EMP_PHOTO FROM EMPLOYEE
+				    ) S
+		WHERE N.NOTE_SEND = S.NUM 
+			AND NOTE_REV = #{userId} 
+			AND N.NOTE_STATUS != 6
+			AND N.NOTE_STATUS != 9
+			AND N.NOTE_REV != N.NOTE_SEND
+		ORDER BY NOTE_DT DESC
+	</select>
+	
+	<select id="sendList" parameterType="int" resultType="notevo">
+		SELECT N.NOTE_NUM, N.NOTE_SEND, N.SEND_NM, N.NOTE_REV, N.REV_NM, N.NOTE_TITLE, N.NOTE_CONTENT, N.NOTE_DT, N.NOTE_STATUS,
+		        S.PHOTO
+		FROM NOTE N, (
+				    SELECT STU_NUM AS NUM, STU_PHOTO AS PHOTO FROM STUDENT
+				    UNION
+				    SELECT TEA_NUM, TEA_PHOTO FROM TEACHER
+				    UNION
+				    SELECT EMP_NUM, EMP_PHOTO FROM EMPLOYEE
+				    ) S
+		WHERE N.NOTE_REV = S.NUM 
+			AND NOTE_SEND = #{userId}
+			AND N.NOTE_STATUS != 5
+			AND N.NOTE_STATUS != 9
+			AND N.NOTE_REV != N.NOTE_SEND
+		ORDER BY NOTE_DT DESC
+	</select>
+	
+	<select id="delList" parameterType="int" resultType="notevo">
+		SELECT N.NOTE_NUM, N.NOTE_SEND, N.SEND_NM, N.NOTE_REV, N.REV_NM, N.NOTE_TITLE, N.NOTE_CONTENT, N.NOTE_DT, N.NOTE_STATUS,
+		        S.PHOTO
+		FROM NOTE N, (
+				    SELECT STU_NUM AS NUM, STU_PHOTO AS PHOTO FROM STUDENT
+				    UNION
+				    SELECT TEA_NUM, TEA_PHOTO FROM TEACHER
+				    UNION
+				    SELECT EMP_NUM, EMP_PHOTO FROM EMPLOYEE
+				    ) S
+		WHERE N.NOTE_REV = S.NUM 
+			AND ((NOTE_SEND = #{userId} AND N.NOTE_STATUS = 5)
+			OR (NOTE_REV = #{userId} AND N.NOTE_STATUS = 6)
+			OR N.NOTE_STATUS = 9)
+		ORDER BY NOTE_DT DESC
+	</select>
+	
+	<update id="changeStat" parameterType="notevo">
+		UPDATE NOTE
+		SET NOTE_STATUS = #{noteStatus}
+		WHERE NOTE_NUM = #{noteNum}
+	</update>
+	
+	<select id="selfList" parameterType="int" resultType="notevo">
+		SELECT N.NOTE_NUM, N.NOTE_SEND, N.SEND_NM, N.NOTE_REV, N.REV_NM, N.NOTE_TITLE, N.NOTE_CONTENT, N.NOTE_DT, N.NOTE_STATUS,
+		        S.PHOTO
+		FROM NOTE N, (
+				    SELECT STU_NUM AS NUM, STU_PHOTO AS PHOTO FROM STUDENT
+				    UNION
+				    SELECT TEA_NUM, TEA_PHOTO FROM TEACHER
+				    UNION
+				    SELECT EMP_NUM, EMP_PHOTO FROM EMPLOYEE
+				    ) S
+		WHERE N.NOTE_REV = S.NUM 
+			AND NOTE_SEND = #{userId}
+			AND NOTE_REV = #{userId}
+			AND <![CDATA[ N.NOTE_STATUS < 5 ]]>
+		ORDER BY NOTE_DT DESC
+	</select>
+	
+
+</mapper>

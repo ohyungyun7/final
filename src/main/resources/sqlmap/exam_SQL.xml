@@ -1,0 +1,179 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- namespace : xml파일이 여러개일 수 있으므로 이를 구별하기 위한 용도로 사용 -->
+ <mapper namespace="kr.or.ddit.mapper.ExamMapper">
+
+
+   <resultMap type="examQueVO" id="examQueMap">
+  	<result property="exmqueNum" column="EXMQUE_NUM"/>
+  	<result property="exmNum" column="EXM_NUM"/>
+  	<result property="sbjNum" column="SBJ_NUM"/>
+  	<result property="examqueQue" column="EXAMQUE_QUE"/>
+  	<result property="examqueAns" column="EXAMQUE_ANS"/>
+  	<collection property="examSelList" resultMap="examSel"/>
+  </resultMap>
+  <resultMap type="examSelVO" id="examSel">
+  	<result property="esNum" column="ES_NUM"/>
+  	<result property="exmqueNum" column="EXMQUE_NUM"/>
+  	<result property="exmNum" column="EXM_NUM"/>
+  	<result property="sbjNum" column="SBJ_NUM"/>
+  	<result property="esQue" column="ES_QUE"/>
+  </resultMap>
+
+  <!-- 시험문제를 이전에 미리 작성했는지 안했는지 확인 -->
+  <select id="examCheck" parameterType="string" resultType="int">
+  select count(*)
+	from exam
+	where sbj_num=#{sbjNum}
+  </select>
+
+  <insert id="examMake" parameterType="string">
+  insert into exam
+	(EXM_NUM, SBJ_NUM, EXM_DT)
+	values
+	(SEQ_EXAM.nextval, #{sbjNum},TO_DATE(sysdate,'YYYY-MM-DD HH-MI-SS'))
+  </insert>
+
+  <select id="subjectDetail" parameterType="string" resultType="subjectVO">
+	 select a.SBJ_NUM, a.DEPT_NUM, a.TEA_NUM, a.SBJ_TITLE, a.SBJ_GRADE,
+	       a.SBJ_RECODE, a.SBJ_PERSONNEL, a.SBJ_YN, a.SBJ_COMRE, a.SBJ_OC, a.SBJ_RS, a.CURRENT_DATA,
+	       b.TEA_NM_KOR
+		from subject a, teacher b
+		where
+		a.tea_num = b.tea_num
+		and
+		a.sbj_num = #{sbjNum}
+  </select>
+
+  <select id="getExamNum" parameterType="string" resultType="int">
+  	select EXM_NUM
+	from exam
+	where sbj_num = #{sbjNum}
+  </select>
+
+  <!-- 각 문항의 질문과 답 데이터 INSERT -->
+  <insert id="examQue" parameterType="hashMap">
+  	INSERT INTO EXAM_QUE
+  	(EXMQUE_NUM, EXM_NUM, SBJ_NUM, EXAMQUE_QUE, EXAMQUE_ANS)
+  	VALUES
+  	(SEQ_EXAM_QUE.NEXTVAL , #{examNum}, #{sbjNum}, #{question},#{queAns})
+  </insert>
+
+  <!-- 질문과 답이 있는 EXAM_QUE 테이블의 기본키 가져오기 -->
+  <select id="getExamqueNum" parameterType="hashMap" resultType="int">
+	  SELECT MAX(EXMQUE_NUM)
+	  FROM EXAM_QUE
+	  WHERE EXM_NUM=#{examNum} AND SBJ_NUM=#{sbjNum}
+  </select>
+
+  <!-- 각 문제에 대한 항목들 데이터 INSERT -->
+  <insert id="examSel" parameterType="hashMap">
+  	  INSERT INTO EXAM_SEL
+  	  (ES_NUM, EXMQUE_NUM, EXM_NUM, SBJ_NUM, ES_QUE)
+  	  VALUES
+  	  (SEQ_EXAM_SEL.NEXTVAL, #{exmqueNum}, #{examNum}, #{sbjNum}, #{queList})
+  </insert>
+
+  <!-- 작성중인 시험의 질문과 답, 질문의 항목 1:N으로 가져오기 -->
+  <select id="getExamQueList" parameterType="hashMap" resultMap="examQueMap">
+		select a.EXMQUE_NUM, a.EXM_NUM, a.SBJ_NUM, a.EXAMQUE_QUE, a.EXAMQUE_ANS, b.es_que
+		from exam_que a, exam_sel b
+		where a.exmque_num = b.exmque_num
+		and
+		a.exm_num = #{exmNum}
+		and
+		a.sbj_num = #{sbjNum}
+		order by a.exmque_num asc , b.es_que asc
+  </select>
+
+  <!-- 시험문제 업데이트가 워낙 까다로워서 EXAM_SEL 테이블을 전체 지운 뒤 다시 INSERT -->
+  <delete id="deleteExamSel" parameterType="hashMap">
+  		delete from EXAM_SEL WHERE SBJ_NUM = #{sbjNum}
+  </delete>
+
+   <!-- 시험문제 업데이트가 워낙 까다로워서 EXAM_QUE 테이블을 전체 지운 뒤 다시 INSERT -->
+  <delete id="deleteExamQue" parameterType="hashMap">
+  		delete from EXAM_QUE WHERE SBJ_NUM = #{sbjNum}
+  </delete>
+
+  <delete id="deleteExam" parameterType="hashMap">
+  		delete from EXAM WHERE SBJ_NUM = #{sbjNum}
+  </delete>
+
+
+    <select id="getExamQue" parameterType="hashMap" resultType="examQueVO">
+		SELECT EXMQUE_NUM, EXM_NUM, SBJ_NUM, EXAMQUE_QUE, EXAMQUE_ANS
+		FROM EXAM_QUE
+		WHERE EXM_NUM= #{exmNum}
+		AND
+		SBJ_NUM = #{sbjNum}
+		ORDER BY EXMQUE_NUM ASC
+  </select>
+
+  <insert id="submitMyAnswer" parameterType="hashMap">
+  	insert into answer
+	(ANS_NUM, STU_NUM, EXMQUE_NUM, EXM_NUM, SBJ_NUM, ANS_ANS)
+	values
+	(SEQ_ANSWER.nextval,${stuNum}, #{exmqueNum}, #{exmNum}, #{sbjNum}, #{ansAns})
+  </insert>
+
+  <select id="getStuInfo" parameterType="int" resultType="stuVO">
+
+
+	  	SELECT A.STU_NUM, A.STU_NM_KOR, A.STU_NM_ENG,
+	       A.STU_REG1 ,
+	       SUBSTR(A.STU_REG2,1,1) STU_REG2 ,
+	       A.STU_EMAIL,
+	       CASE WHEN A.STU_SEMESTER = 1 THEN '1학년'
+	            WHEN A.STU_SEMESTER = 2 THEN '1학년'
+	            WHEN A.STU_SEMESTER = 3 THEN '2학년'
+	            WHEN A.STU_SEMESTER = 4 THEN '2학년'
+	            WHEN A.STU_SEMESTER = 5 THEN '3학년'
+	            WHEN A.STU_SEMESTER = 6 THEN '3학년'
+	            WHEN A.STU_SEMESTER = 7 THEN '4학년'
+	            WHEN A.STU_SEMESTER = 8 THEN '4학년'
+	            ELSE '4학년'
+	            END STU_SEMESTER,
+	        B.DEPT_NM
+	    FROM STUDENT A , DEPARTMENT B
+	    WHERE
+	    A.DEPT_NUM = B.DEPT_NUM
+	    AND
+	    A.STU_NUM = #{stuNum}
+  </select>
+
+	<select id="examQueList" parameterType="hashMap" resultType="examQueVO">
+		SELECT EXMQUE_NUM, EXM_NUM, SBJ_NUM, EXAMQUE_QUE, EXAMQUE_ANS
+		FROM EXAM_QUE
+		WHERE EXM_NUM = (SELECT EXM_NUM FROM EXAM WHERE SBJ_NUM = #{sbjNum})
+		AND
+		SBJ_NUM = #{sbjNum}
+		order by EXMQUE_NUM ASC
+	</select>
+
+	<select id="answerVOList" parameterType="hashMap" resultType="answerVO">
+		SELECT ANS_NUM, STU_NUM, EXMQUE_NUM, EXM_NUM, SBJ_NUM, ANS_ANS
+		FROM ANSWER
+		WHERE
+		STU_NUM = #{stuNum}
+		AND
+		EXM_NUM = (SELECT EXM_NUM FROM EXAM WHERE SBJ_NUM = #{sbjNum})
+		AND
+		SBJ_NUM = #{sbjNum}
+		ORDER BY ANS_NUM ASC
+	</select>
+
+	<select id="examQueListAndAns" parameterType="hashMap" resultType="examQueVO">
+		SELECT A.EXMQUE_NUM, A.EXM_NUM, A.SBJ_NUM, A.EXAMQUE_QUE, A.EXAMQUE_ANS , B.ANS_ANS
+		FROM EXAM_QUE A , ANSWER B
+		WHERE
+		A.SBJ_NUM = #{sbjNum}
+		AND
+		A.EXMQUE_NUM = B.EXMQUE_NUM
+		AND
+		B.STU_NUM = #{stuNum}
+		order by A.EXMQUE_NUM ASC
+	</select>
+ </mapper>

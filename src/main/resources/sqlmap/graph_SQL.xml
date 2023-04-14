@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+  <mapper namespace="kr.or.ddit.mapper.GraphMapper">
+
+<!-- colleageVO -->
+	<select id="colleageList" resultType="colleageVO">
+		select coll_nm
+		from colleage
+		where coll_num !=0
+		order by COLL_NUM asc
+	</select>
+
+	<select id="sumPeopleList" resultType="colleageVO">
+		select a.COLL_NUM ,a.coll_nm ,b.dept_num ,b.dept_nm , c.stu_nm_kor ,count(b.dept_num) count
+		from colleage a , department b , student c
+		where a.coll_num = b.coll_num
+		and
+		b.dept_num = c.dept_num
+		and
+		a.coll_num !=0
+		and
+		a.coll_num is not null
+		group by rollup(a.COLL_NUM ,(a.coll_nm ,b.dept_num ,b.dept_nm , c.stu_nm_kor) )
+		having a.coll_nm is null and a.coll_num is not null
+		order by a.COLL_NUM asc
+	</select>
+
+	<select id="departSumPeople" resultType="colleageVO">
+		select a.DEPT_NUM, a.DEPT_NM , count(a.dept_nm) count
+		from department a , student b
+		where a.DEPT_NUM !=0
+		and
+		a.dept_num = b.dept_num
+		group by a.DEPT_NUM,a.DEPT_NM
+		order by a.DEPT_NUM asc
+	</select>
+
+	<select id="yearList" resultType="stuVO">
+		SELECT DISTINCT(T.YEAR2) YEAR2
+		FROM(
+		    SELECT SUBSTR(STU_NUM,1,4) YEAR2
+		    FROM STUDENT
+		) T
+		ORDER BY T.YEAR2 ASC
+	</select>
+
+	<select id="mealFemale" resultType="stuVO">
+		SELECT COUNT(T.REG) count
+		    FROM(
+		        SELECT SUBSTR(STU_NUM,1,4) YEAR2,
+		               SUBSTR(STU_REG2,1,1) REG
+		        FROM STUDENT
+		       ) T
+		   GROUP BY  T.YEAR2, T.REG
+		   ORDER BY T.YEAR2 ASC
+	</select>
+
+	<select id="departList" resultType="departmentVO">
+		select T.NUM, T.DEPT_NM
+			FROM
+			    (
+			        SELECT ROWNUM NUM, DEPT_NM
+			        FROM DEPARTMENT
+			        WHERE DEPT_NUM !=0
+			        ORDER BY DEPT_NUM ASC
+			    ) T
+			WHERE T.NUM  <![CDATA[<]]>= 9
+	</select>
+
+	<select id="departMaleFemale" resultType="stuVO">
+		SELECT T.DEPT_NUM , T.STU_REG2 , COUNT(T.STU_REG2) COUNT
+			FROM(
+			    SELECT DEPT_NUM,
+			           SUBSTR(STU_REG2,1,1) STU_REG2
+			    FROM STUDENT
+			    ORDER BY DEPT_NUM,STU_REG2 ASC
+			) T
+        WHERE T.DEPT_NUM <![CDATA[<]]>= 9
+        AND
+        T.DEPT_NUM !=0
+        GROUP BY T.DEPT_NUM , T.STU_REG2
+		ORDER BY T.DEPT_NUM ASC
+	</select>
+  </mapper>

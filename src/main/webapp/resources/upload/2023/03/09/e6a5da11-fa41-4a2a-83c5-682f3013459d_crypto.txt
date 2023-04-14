@@ -1,0 +1,106 @@
+
+암호화 복호화 하기
+
+- cmd창
+
+sqlplus sys/java@localhost:1521 as sysdba
+
+grant execute on dbms_crypto to spring;
+
+grant execute on dbms_crypto to public;
+
+grant execute on dbms_obfuscation_tollkit to public;
+
+
+
+
+- 오라클 sql문
+
+-- 암호화 복호화 함수...??
+/
+SET SERVEROUTPUT ON;
+/
+CREATE OR REPLACE PACKAGE pkg_crypto
+IS
+    FUNCTION encrypt ( input_string IN VARCHAR2 ) RETURN RAW;
+    FUNCTION decrypt ( input_string IN VARCHAR2 ) RETURN VARCHAR2;
+END pkg_crypto;
+/
+
+CREATE OR REPLACE PACKAGE BODY pkg_crypto
+IS
+-- 에러 발생시에 error code 와 message를 받기 위한 변수 지정.
+    SQLERRMSG   VARCHAR2(255);
+    SQLERRCDE   NUMBER;
+    
+    FUNCTION encrypt (input_string IN VARCHAR2 )
+     RETURN RAW
+    IS
+        key_data_raw        RAW(64);
+        converted_raw       RAW(64);
+        encrypted_raw       RAW(64); 
+    BEGIN
+        -- 들어온 data 와 암호 키를 각각 RAW 로 변환한다.
+        converted_raw := UTL_I18N.STRING_TO_RAW(input_string , 'AL32UTF8');
+        key_data_raw  := UTL_I18N.STRING_TO_RAW(  '12345678' , 'AL32UTF8');
+
+        -- DBMS_CRYPTO.ENCRYPT 로 암호화 하여 encrypted_raw 에 저장.
+        encrypted_raw := DBMS_CRYPTO.ENCRYPT(  src => converted_raw ,
+                   typ => DBMS_CRYPTO.DES_CBC_PKCS5 , -- typ 부분만 변경하면 원하는 알고리즘을 사용할 수 있다. key value byte 가 다 다르니 확인해야 한다.
+                   key => key_data_raw ,
+                   iv =>  NULL);
+        RETURN encrypted_raw;
+    END encrypt;
+
+    FUNCTION decrypt (input_string IN VARCHAR2 )
+     RETURN VARCHAR2
+    IS
+        converted_string    VARCHAR2(64);
+        key_data_raw        RAW(64);
+        decrypted_raw       VARCHAR2(64);
+    BEGIN
+        key_data_raw := UTL_I18N.STRING_TO_RAW(  '12345678' , 'AL32UTF8');
+        decrypted_raw := DBMS_CRYPTO.DECRYPT( src => input_string ,
+                                              typ => DBMS_CRYPTO.DES_CBC_PKCS5 ,
+                                              key => key_data_raw ,
+                                              iv =>  NULL);
+
+        -- DBMS_CRYPTO.DECRYPT 수행 결과 나온 복호화 된 raw data를 varchar2로 변환하면 끝!
+        converted_string := UTL_I18N.RAW_TO_CHAR(decrypted_raw, 'AL32UTF8');
+        RETURN converted_string;
+    END decrypt ;
+END pkg_crypto;
+/
+
+
+-- 암호화 복호화 테스트 해보기
+SELECT pkg_crypto.encrypt('test') from dual; -- 암호화
+select pkg_crypto.decrypt('A04B686B118AF67B') from dual; -- 복호화
+
+-- 실전에 이용해보기
+-- mem 테이블 안에 user_pw를 암호화 테스트 해보기
+select user_no
+     , user_pw
+     , PKG_CRYPTO.ENCRYPT(user_pw) crypto_pw
+from mem;
+/
+-- mem 테이블 안에 user_pw를 암호화하여 업데이트 하기
+-- CORRELATED SUBQUERY (상관관계 서브쿼리)
+UPDATE MEM A
+SET     A.USER_PW = (
+                SELECT  pkg_crypto.encrypt(B.USER_PW)
+                FROM MEM B
+                WHERE B.USER_NO = A.USER_NO --*****
+        );
+COMMIT;
+
+SELECT * FROM MEM;
+/
+-- ** 개개개개개개개개개개개개 중요함
+		select a.USER_NO, a.USER_ID, 
+        pkg_crypto.decrypt(a.USER_PW) user_pw, 
+        a.USER_NAME, a.COIN, a.REG_DATE, a.UPD_DATE, a.ENABLED,
+		        b.USER_NO, b.AUTH
+		from mem a left outer join mem_auth b
+		on(a.user_no = b.user_no)
+		where a.user_id = 'member1';

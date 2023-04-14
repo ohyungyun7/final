@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.CertificateMapper">
+	
+	<select id="getPrice" parameterType="String" resultType="int">
+		SELECT CT_PRICE FROM CERTIFICATE_TYPE WHERE CT_SNUM = #{ctSnum}
+	</select>
+	
+	<select id="getStuInfo" parameterType="int" resultType="hashMap">
+		SELECT STU_NM_KOR, STU_EMAIL, STU_PN, STU_ADDR1 || STU_ADDR2 AS STU_ADDR, STU_ZIP, STU_STATUS, STU_SEMESTER
+		FROM STUDENT
+		WHERE STU_NUM = #{stuNum}
+	</select>
+
+	<insert id="issuedCertificate" parameterType="issueCertificateVO">
+		INSERT INTO ISSUE_CERTIFICATE(IC_NUM, CT_SNUM, STU_NUM, IC_DT, IC_USAGE)
+		VALUES(#{icNum}, #{ctSnum}, #{stuNum}, SYSDATE, #{icUsage})
+	</insert>
+	
+	<select id="getIcList" parameterType="int" resultType="hashMap">
+		SELECT IC_NUM, CT_SNUM, (SELECT CT_TYPE FROM CERTIFICATE_TYPE B WHERE A.CT_SNUM = B.CT_SNUM) CT_TYPE, 
+		        IC_DT AS SDATE, (IC_DT + 3) EDATE, IC_USAGE
+		FROM ISSUE_CERTIFICATE A
+		WHERE STU_NUM = #{stuNum}
+		AND (IC_DT + 3) > SYSDATE
+	</select>
+	
+	<select id="getInfoForG001" parameterType="int" resultType="hashMap">
+		WITH T AS (SELECT (SELECT COUNT(*) FROM ISSUE_CERTIFICATE) AS NO, STU_NM_KOR, 
+		                    (CASE WHEN SUBSTR(STU_REG2, 1, 1) IN (1,2) THEN 19 ELSE 20 END) || SUBSTR(STU_REG1, 1, 2) || '년 '
+		                    || SUBSTR(STU_REG1, 3, 2) || '월 ' || SUBSTR(STU_REG1, 5, 2) || '일' AS BIRTH,
+		                    D.DEPT_NM, COLL_NUM, SUBSTR(STU_NUM, 1, 4) || '년 3월' SD, 
+		                    (CASE WHEN SUBSTR(STU_REG2, 1, 1) IN (1,3) THEN SUBSTR(STU_NUM, 1, 4) + 6 ELSE SUBSTR(STU_NUM, 1, 4) + 4 END) || '년 2월' ED
+		            FROM STUDENT S, DEPARTMENT D
+		            WHERE STU_NUM = #{stuNum}
+		            AND S.DEPT_NUM = D.DEPT_NUM
+		)
+		SELECT NO, STU_NM_KOR, BIRTH, DEPT_NM, 
+		        (CASE WHEN COLL_NUM = 1 THEN '이학사'
+		             WHEN COLL_NUM = 2 THEN '공학사'
+		             WHEN COLL_NUM = 3 THEN '교육학사'
+		             ELSE SUBSTR(DEPT_NM, 1, LENGTH(DEPT_NM) -1) || '사' END) DEGREE
+		        , SD, ED,
+		        EXTRACT(YEAR FROM SYSDATE) || '년 ' || EXTRACT(MONTH FROM SYSDATE) || '월 ' || EXTRACT(DAY FROM SYSDATE) || '일' AS "DATE"
+		FROM T
+	</select>
+	
+	<select id="getInfoForAT001" parameterType="int" resultType="hashMap">
+		WITH T AS (SELECT (SELECT COUNT(*) FROM ISSUE_CERTIFICATE) AS NO, STU_NM_KOR, 
+		                    (CASE WHEN SUBSTR(STU_REG2, 1, 1) IN (1,2) THEN 19 ELSE 20 END) || SUBSTR(STU_REG1, 1, 2) || '년 '
+		                    || SUBSTR(STU_REG1, 3, 2) || '월 ' || SUBSTR(STU_REG1, 5, 2) || '일' AS BIRTH,
+		                    D.DEPT_NM, COLL_NUM, STU_SEMESTER
+		            FROM STUDENT S, DEPARTMENT D
+		            WHERE STU_NUM = #{stuNum}
+		            AND S.DEPT_NUM = D.DEPT_NUM
+		)
+		SELECT NO, STU_NM_KOR, BIRTH, DEPT_NM, ROUND(STU_SEMESTER / 2) || '학년' GRADE,
+		        (SELECT COLL_NM FROM COLLEAGE C WHERE T.COLL_NUM = C.COLL_NUM) AS COLL_NM, 
+		        EXTRACT(YEAR FROM SYSDATE) || '년 ' || EXTRACT(MONTH FROM SYSDATE) || '월 ' || EXTRACT(DAY FROM SYSDATE) || '일' AS "DATE"
+		FROM T
+	</select>
+	
+</mapper>
+

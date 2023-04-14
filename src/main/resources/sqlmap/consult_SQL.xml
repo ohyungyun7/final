@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.ConsultMapper">
+	
+	<select id="getTeaList" parameterType="int" resultType="teaVO">
+		SELECT TEA_NUM, TEA_NM_KOR
+		FROM TEACHER
+		WHERE DEPT_NUM = 1
+	</select>
+	
+	<select id="getTimeTable" parameterType="int" resultType="hashMap">
+		SELECT C.TIME_TCODE, D.SBJ_TITLE
+		FROM (
+		    SELECT A.TIME_TCODE, B.SBJ_NUM
+		    FROM LECTURE_TM A, (
+		                        SELECT SBJ_NUM AS SBJ_NUM
+		                        FROM COURSE_LIST
+		                        WHERE CL_SEMESTER = (SELECT MAX(CL_SEMESTER) FROM COURSE_LIST)
+		                        ) B
+		    WHERE A.SBJ_NUM = B.SBJ_NUM) C, SUBJECT D
+       WHERE C.SBJ_NUM = D.SBJ_NUM AND D.TEA_NUM = #{teaNum}
+	</select>
+	
+	<select id="getConsultTime" parameterType="int" resultType="hashMap">
+		WITH T AS (
+		    SELECT STU_NUM, TIME_CODE, EXTRACT(MONTH FROM CR_DT) || '/' || EXTRACT(DAY FROM CR_DT) CR_DT
+		    FROM CON_RSVT
+		    WHERE TEA_NUM = #{teaNum}
+   			AND CR_CHECK != 2
+		)
+		SELECT SUBSTR(STU_NM_KOR, 1, 1) || 'X' || NVL(SUBSTR(STU_NM_KOR, 3), '') STU_NM,
+		        TIME_CODE, CR_DT
+		FROM T, (SELECT STU_NM_KOR, STU_NUM FROM STUDENT) K
+		WHERE T.STU_NUM = K.STU_NUM
+	</select>
+	
+	<insert id="appConsult" parameterType="consultVO">
+		INSERT INTO CON_RSVT(CR_NUM, STU_NUM, TEA_NUM, TIME_CODE, CR_TYPE, CR_REASON, CR_CHECK, CR_DT)
+		VALUES (SEQ_CON_RSVT.NEXTVAL, #{stuNum}, #{teaNum}, #{timeCode}, #{crType}, #{crReason}, 0, #{crDt})
+	</insert>
+	
+	
+	<select id="getConsultList" parameterType="int" resultType="hashMap">
+		WITH T AS(
+		    SELECT CR_NUM, STU_NUM, TEA_NUM, TIME_CODE, CR_TYPE, CR_REASON, CR_CHECK, CR_COMRE, CR_DT 
+		    FROM CON_RSVT 
+		    WHERE STU_NUM = #{stuNum}
+		)
+		SELECT T.*, (SELECT TEA_NM_KOR FROM TEACHER WHERE TEA_NUM = T.TEA_NUM) TEA_NM_KOR,
+		        (SELECT TIME_STIME FROM TIME WHERE TIME_TCODE = T.TIME_CODE) TIME
+		FROM T
+		ORDER BY CR_DT DESC
+	</select>
+	
+	<delete id="deleteConsult" parameterType="int">
+		DELETE FROM CON_RSVT WHERE CR_NUM = #{crNum}
+	</delete>
+	
+	<select id="getConsultListByTea" parameterType="hashMap" resultType="hashMap">
+		WITH T AS(
+		    SELECT CR_NUM, STU_NUM, TEA_NUM, TIME_CODE, CR_TYPE, CR_REASON, CR_CHECK, CR_COMRE, CR_DT 
+		    FROM CON_RSVT 
+		    WHERE TEA_NUM = #{teaNum}
+		)
+		SELECT T.*, (SELECT STU_NM_KOR FROM STUDENT WHERE STU_NUM = T.STU_NUM) STU_NM_KOR,
+		        (SELECT TIME_STIME FROM TIME WHERE TIME_TCODE = T.TIME_CODE) TIME
+		FROM T
+		<choose>
+			<when test='type == 0'>
+				WHERE CR_CHECK = 0
+			</when>
+			<when test='type == 1'>
+				WHERE CR_CHECK != 0
+			</when>
+			<otherwise>
+				WHERE 1=1
+			</otherwise>
+		</choose>
+		ORDER BY CR_DT DESC
+	</select>
+	
+	<update id="modifyConsult" parameterType="consultVO">
+		UPDATE CON_RSVT
+		SET CR_CHECK = #{crCheck}
+		<if test="crCheck == 2">
+			, CR_COMRE = #{crComre}
+		</if>
+		WHERE CR_NUM = #{crNum}
+	</update>
+	
+	
+	<select id="forMain" parameterType="int" resultType="hashMap">
+		WITH T AS(
+		    SELECT ROW_NUMBER() OVER(ORDER BY CR_DT) RN, TEA_NUM, CR_CHECK, CR_DT
+		    FROM CON_RSVT
+		    WHERE STU_NUM = 201901006
+		    AND CR_DT >= SYSDATE - 1
+		)
+		SELECT TO_CHAR(T.CR_DT) CR_DT, TEA_NM_KOR, 
+		        (CASE CR_CHECK WHEN 0 THEN '대기'
+		                       WHEN 1 THEN '승인'
+		                       WHEN 2 THEN '반려' END) STATUS
+		FROM T, TEACHER A
+		WHERE T.TEA_NUM = A.TEA_NUM
+<![CDATA[		AND T.RN < 5	]]>
+	</select>
+</mapper>
+

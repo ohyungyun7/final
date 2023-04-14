@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+  <mapper namespace="kr.or.ddit.mapper.fLoginMapper">
+  
+  	<select id="getAuth" parameterType="userVO" resultType="string">
+		SELECT A.AUTH
+		FROM AUTHENTICATE A LEFT OUTER JOIN (
+		                                    SELECT USERNAME, PASSWORD FROM USERS
+		                                    WHERE USERNAME = #{username} AND pkg_crypto.decrypt(PASSWORD) = #{password}) B
+		ON(A.USERNAME = B.USERNAME)
+		WHERE B.USERNAME = #{username} 		
+  	</select>
+  	
+  	<select id="getStudent" parameterType="userVO" resultType="userVO">
+		SELECT A.STU_NUM username, A.DEPT_NUM deptNum, A.STU_NM_KOR name, A.STU_PHOTO photo, A.STU_STATUS status,
+		       D.AUTH auth, D.PASSWORD password
+		FROM STUDENT A LEFT OUTER JOIN (       
+							            SELECT B.AUTH AUTH, B.USERNAME USERNAME, pkg_crypto.decrypt(C.PASSWORD) PASSWORD
+							            FROM AUTHENTICATE B LEFT OUTER JOIN USERS C
+							            ON(B.USERNAME = C.USERNAME)
+							            WHERE C.USERNAME = #{username})D
+		ON(A.STU_NUM = D.USERNAME)
+		WHERE A.STU_NUM = #{username}		
+  	</select>
+  	
+  	<select id="getTeacher" parameterType="userVO" resultType="userVO">
+		SELECT A.TEA_NUM username, A.DEPT_NUM deptNum, A.TEA_NM_KOR name, A.TEA_PHOTO photo, A.MAJOR major,
+		       D.AUTH auth, D.PASSWORD password
+		FROM TEACHER A LEFT OUTER JOIN (       
+							            SELECT B.AUTH AUTH, B.USERNAME USERNAME, pkg_crypto.decrypt(C.PASSWORD) PASSWORD
+							            FROM AUTHENTICATE B LEFT OUTER JOIN USERS C
+							            ON(B.USERNAME = C.USERNAME)
+							            WHERE C.USERNAME = #{username})D
+		ON(A.TEA_NUM = D.USERNAME)
+		WHERE A.TEA_NUM = #{username}  	
+  	</select>
+
+  	<select id="getAdmin" parameterType="userVO" resultType="userVO">
+		SELECT A.EMP_NUM username, A.EMP_NM_KOR name, A.EMP_PHOTO photo,
+		       D.AUTH auth, D.PASSWORD password
+		FROM EMPLOYEE A LEFT OUTER JOIN (       
+							            SELECT B.AUTH AUTH, B.USERNAME USERNAME, pkg_crypto.decrypt(C.PASSWORD) PASSWORD
+							            FROM AUTHENTICATE B LEFT OUTER JOIN USERS C
+							            ON(B.USERNAME = C.USERNAME)
+							            WHERE C.USERNAME = #{username})D
+		ON(A.EMP_NUM = D.USERNAME)
+		WHERE A.EMP_NUM = #{username}  	
+  	</select>
+  	
+	<select id="findId" parameterType="map" resultType="string">
+	    SELECT TO_CHAR(COALESCE(STU_NUM, TEA_NUM, EMP_NUM)) AS USERNAME
+	    FROM (SELECT STU_NUM, STU_NM_KOR
+	            FROM STUDENT
+	            WHERE STU_NM_KOR = #{name} AND STU_EMAIL = #{email}) A
+	            FULL OUTER JOIN (SELECT TEA_NUM, TEA_NM_KOR
+	                            FROM TEACHER
+	                            WHERE TEA_NM_KOR = #{name} AND TEA_EMAIL = #{email}) B ON(1=1)
+	            FULL OUTER JOIN (SELECT EMP_NUM, EMP_NM_KOR
+	                            FROM EMPLOYEE
+	                            WHERE EMP_NM_KOR = #{name} AND EMP_EMAIL = #{email}) C ON(1=1)	
+	</select>  	
+	
+	<select id="serachUser" parameterType="map" resultType="int">
+	    SELECT (COUNT1 + COUNT2 + COUNT3) AS COUNT
+	    FROM (SELECT COUNT(*) AS COUNT1
+	            FROM STUDENT
+	            WHERE STU_NUM = TO_NUMBER(#{id}) AND STU_NM_KOR = #{name} AND STU_EMAIL = #{email}) A
+	            FULL OUTER JOIN (SELECT COUNT(*) AS COUNT2
+	                             FROM TEACHER
+	                             WHERE TEA_NUM = TO_NUMBER(#{id}) AND TEA_NM_KOR = #{name} AND TEA_EMAIL = #{email}) B ON(1=1)
+	            FULL OUTER JOIN (SELECT COUNT(*) AS COUNT3
+	                             FROM EMPLOYEE
+	                             WHERE  EMP_NUM = TO_NUMBER(#{id}) AND EMP_NM_KOR = #{name} AND EMP_EMAIL = #{email}) C ON(1=1)
+	</select>
+	
+	<update id="pwUpdate" parameterType="map">
+  		UPDATE USERS SET PASSWORD = (SELECT pkg_crypto.encrypt(#{pw}) from dual)
+  		WHERE USERNAME = #{username}		
+	</update>
+  	
+ 
+  </mapper>

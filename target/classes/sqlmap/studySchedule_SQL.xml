@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace : xml파일이 여러개일 수 있으므로
+	이를 구별하기 위한 식별 용도로 사용
+ -->
+<mapper namespace="kr.or.ddit.mapper.StudyScheduleMapper">
+
+	<insert id="addEvent" parameterType="ssVO">
+		<selectKey resultType="int" order="BEFORE" keyProperty="id">
+			SELECT NVL(MAX(SS_NUM),0) + 1
+            FROM STUDY_SCHEDULE
+		</selectKey>
+		INSERT INTO STUDY_SCHEDULE(SS_NUM, S_NUM, STU_NUM, SS_TITLE, SS_CONTENT, 
+						SS_SDT, SS_EDT, SS_COLOR, SS_ONEDAYALL, SS_KIND)
+		VALUES(#{id}, #{srNum}, #{stuNum}, #{title}, #{description}, 
+				#{start}, #{end}, #{calendar}, #{allDay}, 0)
+	</insert>
+	
+	<select id="ssDataList" parameterType="int" resultType="ssVO">
+		SELECT SS_NUM AS "id", S_NUM AS "srNum", STU_NUM AS "stuNum", SS_TITLE AS "title", SS_CONTENT AS "description", 
+						SS_SDT AS "start", SS_EDT AS "end", SS_COLOR AS "calendar", 
+						SS_ONEDAYALL AS "allDay", SS_KIND AS "ssKind"
+		FROM STUDY_SCHEDULE
+		WHERE S_NUM = #{srNum}	
+	</select>
+	
+	<update id="updateEvent" parameterType="ssVO">
+		UPDATE STUDY_SCHEDULE SET
+			SS_TITLE = #{title}, SS_CONTENT = #{description}, 
+						SS_SDT = #{start}, SS_EDT = #{end}, SS_COLOR = #{calendar}, SS_ONEDAYALL = #{allDay}
+		WHERE SS_NUM = ${id}				
+	</update>
+	
+	<delete id="removeEvent" parameterType="ssVO">
+		DELETE FROM STUDY_SCHEDULE
+		WHERE SS_NUM = ${id}	 
+	</delete>
+	
+
+
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

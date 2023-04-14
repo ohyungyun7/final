@@ -1,0 +1,1033 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace : xml파일이 여러개일 수 있으므로
+	이를 구별하기 위한 식별 용도로 사용
+ -->
+<mapper namespace="kr.or.ddit.mapper.CourseMapper">
+	<!-- (학생) 전체 학기 수강 목록 조회 -->
+	<select id="getCourseList2" parameterType="integer" resultType="courseVO">
+		SELECT A.SBJ_NUM, A.TEA_NUM, A.SBJ_TITLE, B.TEA_NM_KOR, C.STU_NUM
+		FROM SUBJECT A
+		INNER JOIN TEACHER B
+		ON(A.TEA_NUM = B.TEA_NUM)
+		INNER JOIN COURSE_LIST C
+		ON(A.SBJ_NUM = C.SBJ_NUM)
+		WHERE C.STU_NUM = #{stuNum}
+		AND A.SBJ_OC = 1
+	</select>
+
+
+
+	<!-- (학생) 금학기 수강 목록 조회(수정 전) -->
+	<select id="getCourseList_origin" parameterType="integer" resultType="courseVO">
+		SELECT  A.SBJ_NUM, A.TEA_NUM, A.SBJ_TITLE, B.TEA_NM_KOR, C.STU_NUM, C.CL_SEMESTER
+		FROM    SUBJECT A
+		INNER JOIN TEACHER B
+		ON(A.TEA_NUM = B.TEA_NUM)
+		INNER JOIN COURSE_LIST C
+		ON(A.SBJ_NUM = C.SBJ_NUM)
+		WHERE   C.STU_NUM = #{stuNum}
+		AND     A.SBJ_OC = 1
+		AND     C.CL_SEMESTER = '2023-01'
+	</select>
+
+
+	<resultMap type="courseVO" id="courseMap">
+		<result property="sbjNum" column="SBJ_NUM" />
+		<result property="teaNum" column="TEA_NUM" />
+		<result property="sbjTitle" column="SBJ_TITLE" />
+		<result property="teaNmKor" column="TEA_NM_KOR" />
+		<result property="stuNum" column="STU_NUM" />
+		<collection property="ltList" resultMap="ltMap"></collection>
+	</resultMap>
+
+	<resultMap type="LectureTmVO" id="ltMap">
+		<result property="ltNum" column="LT_NUM" />
+		<result property="sbjNum" column="SBJ_NUM" />
+		<result property="roomCode" column="ROOM_CODE" />
+		<result property="timeTcode" column="TIME_TCODE" />
+	</resultMap>
+	<!-- (학생) 금학기 수강 목록 조회(수정 후) -->
+	<select id="getCourseList" parameterType="integer" resultMap="courseMap">
+		SELECT  A.SBJ_NUM, A.TEA_NUM, A.SBJ_TITLE, B.TEA_NM_KOR, C.STU_NUM
+		      , C.CL_SEMESTER
+		      , REPLACE(REPLACE(REPLACE(REPLACE(REPLACE
+		        (REPLACE(REPLACE(D.TIME_TCODE, 'MON', '월')
+		                                     , 'TUE', '화')
+		                                     , 'WEN', '수')
+		                                     , 'THU', '목')
+		                                     , 'FRI', '금')
+		                                     , 'SAT', '토')
+		                                     , 'SUN', '일')AS TIME_TCODE
+		FROM    SUBJECT A
+		INNER JOIN TEACHER B
+		ON(A.TEA_NUM = B.TEA_NUM)
+		INNER JOIN COURSE_LIST C
+		ON(A.SBJ_NUM = C.SBJ_NUM)
+		LEFT OUTER JOIN LECTURE_TM D
+		ON(D.SBJ_NUM = C.SBJ_NUM)
+		WHERE   C.STU_NUM = #{stuNum}
+		AND     A.SBJ_OC = 1
+		AND     C.CL_SEMESTER = '2023-01'
+		ORDER BY D.TIME_TCODE
+	</select>
+
+
+	<!-- (교수)금학기 강의 목록 조회 -->
+	<select id="getCourseListPro2" parameterType="integer" resultType="courseVO">
+		SELECT SBJ_NUM, TEA_NUM, SBJ_TITLE
+		FROM SUBJECT
+		WHERE TEA_NUM = #{teaNum}
+	</select>
+
+	<!-- (교수)금학기 강의 목록 조회 -->
+	<select id="getCourseListPro" parameterType="integer" resultType="courseVO">
+		SELECT  DISTINCT A.SBJ_NUM, A.TEA_NUM, A.SBJ_TITLE
+		FROM    SUBJECT A
+		LEFT OUTER JOIN COURSE_LIST B
+		ON(B.SBJ_NUM = A.SBJ_NUM)
+		WHERE   TEA_NUM = #{teaNum}
+		AND     A.SBJ_OC = 1
+		AND     B.CL_SEMESTER = '2023-01'
+		ORDER BY A.SBJ_TITLE ASC
+	</select>
+
+	<select id="getCourseListProByMap" parameterType="integer" resultType="HashMap">
+		SELECT SBJ_NUM, TEA_NUM, SBJ_TITLE
+		FROM SUBJECT
+		WHERE TEA_NUM = #{teaNum}
+	</select>
+
+
+	<!-- (학생)주차별 목록 조회 -->
+	<select id="detail" parameterType="courseVO" resultType="courseDetailVO">
+		SELECT A.SI_NUM, A.SI_TARGET, A.SI_ONLINE, B.SP_ONLINEYN, A.SI_HWYN
+		FROM SUBJECT_INDEX A
+		INNER JOIN SUBJECT_PLAN B
+		ON(A.SP_NUM = B.SP_NUM)
+		WHERE A.SBJ_NUM=#{sbjNum}
+		ORDER BY TO_NUMBER(A.SI_NUM)
+	</select>
+
+	<!-- 공지사항 목록 조회 -->
+	<select id="getNoticeList" parameterType="courseVO" resultType="courseNoticeVO">
+		SELECT	ROW_NUMBER() OVER(ORDER BY A.SN_NUM) ROW_NUM, A.SN_NUM, A.SN_TITLE, B.TEA_NM_KOR, A.SN_DT
+			  , A.SN_HIT, A.SN_READ
+		FROM	SUBJECT_NOTICE A
+		INNER JOIN TEACHER B
+		ON(A.TEA_NUM = B.TEA_NUM)
+		WHERE	A.SBJ_NUM = #{sbjNum}
+		ORDER BY A.SN_NUM DESC
+	</select>
+
+	<!-- 과제 목록 조회 -->
+	<select id="getAssignmentList2" parameterType="String" resultType="courseAssignmentVO">
+		SELECT	ROW_NUMBER() OVER(ORDER BY TO_NUMBER(A.SI_NUM) DESC) ROW_NUM, A.AS_NUM, A.SI_NUM, A.AS_TITLE, A.AS_CONTENT, A.SP_NUM
+		      , A.SBJ_NUM, A.AS_SDT, A.AS_EDT , B.SBM_NUM
+		FROM	ASSIGNMENT A
+		LEFT OUTER JOIN SUBMIT B
+		ON(A.AS_NUM = B.SBM_ANUM)
+		WHERE	A.SBJ_NUM = #{sbjNum}
+	</select>
+
+	<!-- 과제 목록 조회(*최종) -->
+	<select id="getAssignmentList" parameterType="hashMap" resultType="courseAssignmentVO">
+		SELECT  ROW_NUMBER() OVER(ORDER BY TO_NUMBER(A.SI_NUM) DESC) ROW_NUM
+		      , A.AS_NUM, A.SI_NUM, A.AS_TITLE, A.AS_CONTENT, A.SP_NUM
+		      , A.SBJ_NUM, A.AS_SDT, A.AS_EDT , B.SBM_NUM
+		FROM ASSIGNMENT A
+		LEFT OUTER JOIN (   SELECT SBM_ANUM, SBM_NUM
+		                    FROM SUBMIT
+		                    WHERE STU_NUM = #{stuNum}   )B
+		ON(B.SBM_ANUM = A.AS_NUM)
+		WHERE   A.SBJ_NUM = #{sbjNum}
+	</select>
+
+	<!-- 과제 상세내용 조회 -->
+	<select id="assignmentDetail" parameterType="courseAssignmentVO" resultType="courseAssignmentVO">
+		SELECT	AS_NUM, SI_NUM, AS_TITLE, AS_CONTENT, SP_NUM
+		      , SBJ_NUM, AS_SDT, AS_EDT
+		FROM	ASSIGNMENT
+		WHERE	SBJ_NUM = #{sbjNum}
+		AND 	AS_NUM = #{asNum}
+	</select>
+
+	<!-- (학생)과제 제출 여부 조회 -->
+	<select id="submitCheck" parameterType="submitVO" resultType="submitVO">
+		SELECT	SBM_NUM, SBM_ANUM, SBM_CONTENT, SBM_FILENAME, SBM_SCORE, STU_NUM
+		FROM	SUBMIT
+		WHERE	SBM_ANUM = #{sbmAnum}
+		AND 	STU_NUM = #{stuNum}
+	</select>
+
+	<!-- (학생)과제 제출 -->
+	<insert id="submitAssignment" parameterType="submitVO">
+		MERGE INTO SUBMIT A
+		USING DUAL
+		ON(A.SBM_NUM = #{sbmNum})
+		WHEN MATCHED THEN
+		    UPDATE SET SBM_CONTENT = #{sbmContent}, SBM_FILENAME=#{sbmFilename}
+		WHEN NOT MATCHED THEN
+		    INSERT (SBM_NUM, SBM_ANUM, SBM_CONTENT, SBM_FILENAME, SBM_SCORE, STU_NUM)
+		    VALUES(SEQ_SUBMIT.NEXTVAL, #{sbmAnum}, #{sbmContent},#{sbmFilename}, NULL, #{stuNum})
+	</insert>
+
+	<!-- (학생)MAX과제번호 +1 -->
+	<select id="getSbmNum" resultType="int">
+		SELECT	MAX(SBM_NUM)+1 AS SBM_NUM
+		FROM	SUBMIT
+	</select>
+
+	<!-- (과목별)과제 등록가능한 주차 목록 출력 -->
+	<select id="getSiList" parameterType="String" resultType="subjectIndexVO">
+		SELECT	SI_NUM, SP_NUM, SBJ_NUM, SI_TARGET, SI_ONLINE, SI_HWYN
+		FROM	SUBJECT_INDEX
+		WHERE	SBJ_NUM = #{sbjNum}
+		AND 	SI_HWYN = 0
+		ORDER BY TO_NUMBER(SI_NUM) ASC
+	</select>
+
+	<!-- (교수)과제 등록 -->
+	<insert id="createAssignment" parameterType="courseAssignmentVO">
+		INSERT INTO ASSIGNMENT(AS_NUM, SI_NUM, AS_TITLE, AS_CONTENT, SP_NUM
+		                     , SBJ_NUM, AS_SDT, AS_EDT
+		)VALUES(SEQ_ASSIGNMENT.NEXTVAL, #{siNum}, #{asTitle}, #{asContent}, #{spNum}
+		      , #{sbjNum}, #{asSdt}, #{asEdt})
+	</insert>
+
+	<!-- (교수)과제 수정 -->
+	<update id="updateAssignment" parameterType="courseAssignmentVO">
+		UPDATE	ASSIGNMENT
+		SET	    AS_TITLE = #{asTitle}
+		  	  , AS_CONTENT = #{asContent}
+		  	  , AS_SDT = #{asSdt}
+  		  	  , AS_EDT = #{asEdt}
+		WHERE	AS_NUM = #{asNum}
+	</update>
+
+	<!--(교수)과제 삭제 -->
+	<delete id="deleteAssignment" parameterType="int">
+		DELETE FROM ASSIGNMENT
+		WHERE AS_NUM = #{asNum}
+	</delete>
+
+	<!-- 자료 목록 조회 -->
+	<select id="getReferenceList" parameterType="courseVO" resultType="courseReferenceVO">
+		SELECT ROW_NUMBER() OVER(ORDER BY A.RR_NUM) ROW_NUM
+		     , A.*
+		FROM REFERENCE_ROOM A
+		WHERE SBJ_NUM = #{sbjNum}
+		ORDER BY ROW_NUM DESC
+	</select>
+
+	<!-- 공지사항 상세내용 조회 -->
+	<select id="noticeDetail" parameterType="courseNoticeVO" resultType="courseNoticeVO">
+		SELECT A.SN_NUM, A.SN_TITLE, A.SN_CONTENT, A.SN_DT, A.SN_HIT
+		     , A.SN_FILENAME, C.TEA_NM_KOR
+		FROM SUBJECT_NOTICE A
+		INNER JOIN SUBJECT B
+		ON(A.SBJ_NUM = B.SBJ_NUM)
+		INNER JOIN TEACHER C
+		ON(B.TEA_NUM = C.TEA_NUM)
+		WHERE A.SN_NUM = #{snNum}
+		ORDER BY A.SN_NUM DESC
+	</select>
+
+	<!-- (교수)수강생 목록 조회 -->
+	<select id="getStudentList" parameterType="String" resultType="HashMap">
+		SELECT	A.STU_NUM, A.STU_NM_KOR, A.STU_SEMESTER, B.DEPT_NM, A.STU_EMAIL
+		      , A.STU_PN, C.CL_SEMESTER
+		FROM	STUDENT A
+		LEFT OUTER JOIN DEPARTMENT B
+		ON(B.DEPT_NUM = A.DEPT_NUM)
+		LEFT OUTER JOIN COURSE_LIST C
+		ON(C.STU_NUM = A.STU_NUM)
+		WHERE	C.SBJ_NUM = #{sbjNum}
+		AND     C.CL_SEMESTER = '2023-01'
+		ORDER BY A.STU_NM_KOR ASC
+	</select>
+
+	<!-- (교수)수강생 기본정보 조회 -->
+	<select id="getStuInfo" parameterType="hashMap" resultType="hashMap">
+		SELECT	A.STU_NUM, A.STU_NM_KOR, A.STU_SEMESTER, B.DEPT_NM, A.STU_EMAIL, A.STU_PN
+		FROM	STUDENT A
+		LEFT OUTER JOIN DEPARTMENT B
+		ON(B.DEPT_NUM = A.DEPT_NUM)
+		LEFT OUTER JOIN COURSE_LIST C
+		ON(C.STU_NUM = A.STU_NUM)
+		WHERE 	SBJ_NUM = #{sbjNum}
+		AND 	A.STU_NUM = #{stuNum}
+		AND     C.CL_SEMESTER = '2023-01'
+		ORDER BY A.STU_NM_KOR ASC
+	</select>
+
+	<!-- (교수)공지사항 등록 -->
+	<insert id="createNotice" parameterType="courseNoticeVO">
+		INSERT INTO SUBJECT_NOTICE(
+									SN_NUM, SBJ_NUM, TEA_NUM, SN_TITLE, SN_CONTENT
+								  , SN_DT, SN_FILENAME, SN_HIT, SN_READ
+		)VALUES(SEQ_SUBJECT_NOTICE.NEXTVAL, #{sbjNum}, #{teaNum}, #{snTitle}, #{snContent}
+			  , SYSDATE, #{snFilename}, 0, #{snRead}
+		)
+	</insert>
+
+	<!-- (교수)공지사항 수정 -->
+	<update id="noticeModify" parameterType="courseNoticeVO">
+		UPDATE	SUBJECT_NOTICE
+		SET 	SN_TITLE = #{snTitle}
+		  	  , SN_CONTENT = #{snContent}
+		  	  , SN_FILENAME = #{snFilename}
+		WHERE 	SN_NUM = #{snNum}
+	</update>
+
+	<!-- (교수)공지사항 삭제 -->
+	<delete id="deleteNotice" parameterType="courseNoticeVO">
+		DELETE  FROM SUBJECT_NOTICE
+		WHERE	SBJ_NUM=#{sbjNum}
+		AND 	SN_NUM = #{snNum}
+	</delete>
+
+	<!-- 공지사항 조회수 증가 -->
+	<update id="increaseNoticeHit" parameterType="courseNoticeVO">
+		UPDATE	SUBJECT_NOTICE
+		SET		SN_HIT = #{snHit} + 1
+		WHERE 	SN_NUM = #{snNum}
+	</update>
+
+	<!-- (교수)자료 게시글 등록 -->
+	<insert id="createReference" parameterType="courseReferenceVO">
+		INSERT INTO REFERENCE_ROOM(RR_NUM, SBJ_NUM, RR_TITLE, RR_NM)
+		VALUES(SEQ_REFERENCE_ROOM.NEXTVAL, #{sbjNum}, #{rrTitle}, #{rrNm})
+	</insert>
+
+	<!-- (교수)자료 게시글 삭제 -->
+	<delete id="deleteReference" parameterType="courseReferenceVO">
+		DELETE	FROM REFERENCE_ROOM
+		WHERE	RR_NUM = #{rrNum}
+	</delete>
+
+	<!-- 출석 -->
+	<!-- 과목별 수강생 출석현황 목록 출력 -->
+	<select id="selectAttendanceList" parameterType="String" resultType="HashMap">
+		SELECT	X.STU_NUM, X.STU_NM_KOR, X.DEPT_NM, Y.LT_NUM, Y.AT_WEEK, Y.AT_CHECK
+		FROM
+		    (SELECT C.STU_NUM, D.STU_NM_KOR, D.DEPT_NM
+		     FROM COURSE_LIST C,
+		            (SELECT A.STU_NUM, A.STU_NM_KOR, B.DEPT_NM
+		             FROM STUDENT A, DEPARTMENT B
+		             WHERE A.DEPT_NUM = B.DEPT_NUM) D
+		     WHERE C.STU_NUM=D.STU_NUM AND C.SBJ_NUM=#{sbjNum}) X,
+		    (SELECT	AT_STU_NUM,
+		        	LISTAGG(LT_NUM, ', ') WITHIN GROUP ( ORDER BY LT_NUM ) AS LT_NUM,
+		        	AT_WEEK,
+		        	AT_CHECK
+		    FROM ATTENDANCE
+		    GROUP BY AT_STU_NUM, AT_WEEK, AT_CHECK
+		    ORDER BY AT_STU_NUM, AT_WEEK, LT_NUM) Y
+		WHERE Y.AT_STU_NUM = X.STU_NUM(+)
+	</select>
+
+	<!-- 주차별 강의 횟수 카운트 -->
+	<select id="countLecture" parameterType="String" resultType="hashMap">
+		SELECT COUNT(DISTINCT SUBSTR(TIME_TCODE,1,3)) AS COUNT
+		FROM LECTURE_TM
+		WHERE SBJ_NUM = #{sbjNum}
+	</select>
+
+	<!-- 주차별 강의 횟수 카운트(Map) -->
+	<select id="countLectureMap" parameterType="String" resultType="hashMap">
+		SELECT COUNT(DISTINCT SUBSTR(TIME_TCODE,1,3)) AS COUNT
+		FROM LECTURE_TM
+		WHERE SBJ_NUM = #{sbjNum}
+	</select>
+
+	<!-- 주차별 강의 요일 -->
+	<select id="getCourseDay" parameterType="String" resultType="hashMap">
+		SELECT DISTINCT SUBSTR(A.TIME_TCODE,1,3) AS TIME_TCODE
+		FROM LECTURE_TM A
+		WHERE SBJ_NUM = #{sbjNum}
+		ORDER BY TIME_TCODE ASC
+	</select>
+
+	<!-- 과목별 수강생 출석현황 출력2 -->
+	<select id="getAttendanceList" parameterType="String" resultType="HashMap">
+		SELECT DISTINCT S.STU_NM_KOR, S.STU_NUM, P.DEPT_NM, X.ATTEND, X.LATE, X.ABSENT
+		FROM STUDENT S
+		LEFT OUTER JOIN(
+		            SELECT
+		                    E.AT_STU_NUM AS AT_STU_NUM--, E.AT_WEEK, E.AT_CHECK
+		                  , NVL(T.ATTEND, 0) AS ATTEND
+		                  , NVL(L.LATE, 0) AS LATE
+		                  , NVL(B.ABSENT, 0) AS ABSENT
+		            FROM    ATTENDANCE E
+		            LEFT OUTER JOIN (
+		                               SELECT A.AT_STU_NUM, COUNT(AT_CHECK) AS ATTEND
+		                               FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK
+		                                     FROM ATTENDANCE
+		                                     ORDER BY 1)A
+		                               WHERE A.AT_CHECK = 1
+		                               GROUP BY A.AT_STU_NUM)T
+		            ON(T.AT_STU_NUM = E.AT_STU_NUM)
+		            LEFT OUTER JOIN (
+		                                SELECT A.AT_STU_NUM, COUNT(AT_CHECK) AS LATE
+		                                FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK
+		                                     FROM ATTENDANCE
+		                                     ORDER BY 1)A
+		                                WHERE A.AT_CHECK = 0.67
+		                                GROUP BY A.AT_STU_NUM)L
+		            ON(L.AT_STU_NUM = E.AT_STU_NUM)
+		            LEFT OUTER JOIN (
+		                                SELECT A.AT_STU_NUM, COUNT(AT_CHECK) AS ABSENT
+		                                FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK
+		                                     FROM ATTENDANCE
+		                                     ORDER BY 1)A
+		                                WHERE A.AT_CHECK = 0
+		                                GROUP BY A.AT_STU_NUM)B
+		            ON(B.AT_STU_NUM = E.AT_STU_NUM)
+		            GROUP BY    E.AT_STU_NUM
+		                      , NVL(T.ATTEND, 0)
+		                      , NVL(L.LATE, 0)
+		                      , NVL(B.ABSENT, 0)
+		)X
+		ON(X.AT_STU_NUM = S.STU_NUM)
+		INNER JOIN DEPARTMENT P
+		ON(P.DEPT_NUM = S.DEPT_NUM)
+		INNER JOIN COURSE_LIST C
+		ON(C.STU_NUM = S.STU_NUM)
+		WHERE C.SBJ_NUM = #{sbjNum}
+		ORDER BY S.STU_NM_KOR ASC
+	</select>
+
+	<!-- 전체 수강생 출석 목록 출력 -->
+	<select id="getAllAtendanceList" parameterType="String" resultType="HashMap">
+		SELECT A.STU_NUM, A.STU_NM_KOR, C.DEPT_NM, K.TIME_TCODE, K.AT_WEEK, K.AT_CHECK
+		FROM STUDENT A
+		LEFT OUTER JOIN(
+		    SELECT
+		    D.SBJ_NUM,
+		    SUBSTR(D.TIME_TCODE,1,3) AS TIME_TCODE,
+		    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		    FROM LECTURE_TM D
+		    LEFT OUTER JOIN ATTENDANCE E
+		    ON(E.LT_NUM = D.LT_NUM)
+		    GROUP BY D.SBJ_NUM,
+		    SUBSTR(D.TIME_TCODE,1,3),
+		    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		) K
+		ON(K.AT_STU_NUM = A.STU_NUM)
+		INNER JOIN COURSE_LIST B
+		ON(B.STU_NUM = A.STU_NUM)
+		INNER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = A.DEPT_NUM)
+		WHERE B.SBJ_NUM = #{sbjNum}
+		ORDER BY A.STU_NM_KOR
+		       , K.AT_WEEK
+	</select>
+
+	<resultMap type="courseAttendanceVO" id="attendanceMap">
+		<result property="stuNmKor" column="STU_NM_KOR" />
+		<result property="stuNum" column="STU_NUM" />
+		<result property="deptNm" column="DEPT_NM" />
+		<result property="attend" column="ATTEND" />
+		<result property="late" column="LATE" />
+		<result property="absent" column="ABSENT" />
+		<collection property="atList" resultMap="atListMap"></collection>
+	</resultMap>
+
+	<resultMap type="CourseAtListVO" id="atListMap">
+		<result property="stuNum" column="STU_NUM" />
+		<result property="timeTcode" column="TIME_TCODE" />
+		<result property="atWeek" column="AT_WEEK" />
+		<result property="atCheck" column="AT_CHECK" />
+	</resultMap>
+
+	<!-- 과목별 수강생 목록 및 출석현황(*최종) -->
+	<select id="getAtList" parameterType="String" resultMap="attendanceMap">
+		SELECT O.*, J.TIME_TCODE, J.AT_WEEK, J.AT_CHECK
+		FROM (
+		      SELECT	DISTINCT S.STU_NM_KOR, S.STU_NUM, P.DEPT_NM, NVL(X.ATTEND,0) AS ATTEND, NVL(X.LATE,0) AS LATE
+		      		  , NVL(X.ABSENT,0) AS ABSENT, C.CL_SEMESTER
+		      FROM		STUDENT S
+		      LEFT OUTER JOIN(
+		                        SELECT
+		                                E.AT_STU_NUM AS AT_STU_NUM
+		                              , NVL(T.ATTEND, 0) AS ATTEND
+		                              , NVL(L.LATE, 0) AS LATE
+		                              , NVL(B.ABSENT, 0) AS ABSENT
+		                        FROM    ATTENDANCE E
+		                        LEFT OUTER JOIN (
+		                                           SELECT	U.AT_STU_NUM, COUNT(U.AT_CHECK) AS ATTEND
+		                                           FROM(
+				                                           SELECT	DISTINCT A.AT_STU_NUM, B.SBJ_NUM, A.AT_WEEK, A.AT_CHECK, SUBSTR(B.TIME_TCODE, 1, 3)
+				                                           FROM(
+				                                           			SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK, LT_NUM
+				                                                 	FROM ATTENDANCE
+				                                                 	ORDER BY 1
+				                                                )A
+				                                           LEFT OUTER JOIN LECTURE_TM B
+				                                           ON(B.LT_NUM = A.LT_NUM)
+				                                           WHERE	A.AT_CHECK = 1
+				                                           AND 		B.SBJ_NUM = #{sbjNum}
+		                                           )U
+		                                           GROUP BY U.AT_STU_NUM
+		                                        )T
+		                        ON(T.AT_STU_NUM = E.AT_STU_NUM)
+		                        LEFT OUTER JOIN (
+		                                           SELECT 	U.AT_STU_NUM, COUNT(U.AT_CHECK) AS LATE
+		                                           FROM(
+				                                           SELECT 	DISTINCT A.AT_STU_NUM, B.SBJ_NUM, A.AT_WEEK, A.AT_CHECK, SUBSTR(B.TIME_TCODE, 1, 3)
+				                                           FROM(
+				                                           			SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK, LT_NUM
+				                                                 	FROM ATTENDANCE
+				                                                 	ORDER BY 1
+				                                                )A
+				                                           LEFT OUTER JOIN LECTURE_TM B
+				                                           ON(B.LT_NUM = A.LT_NUM)
+				                                           WHERE 	A.AT_CHECK = 0.67
+				                                           AND 		B.SBJ_NUM = #{sbjNum}
+		                                           )U
+		                                           GROUP BY U.AT_STU_NUM
+		                                        )L
+		                        ON(L.AT_STU_NUM = E.AT_STU_NUM)
+		                        LEFT OUTER JOIN (
+		                                           SELECT U.AT_STU_NUM, COUNT(U.AT_CHECK) AS ABSENT
+		                                           FROM(
+				                                           SELECT 	DISTINCT A.AT_STU_NUM, B.SBJ_NUM, A.AT_WEEK, A.AT_CHECK, SUBSTR(B.TIME_TCODE, 1, 3)
+				                                           FROM(
+				                                           			SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK, LT_NUM
+				                                                 	FROM ATTENDANCE
+				                                                 	ORDER BY 1
+				                                                )A
+				                                           LEFT OUTER JOIN LECTURE_TM B
+				                                           ON(B.LT_NUM = A.LT_NUM)
+				                                           WHERE 	A.AT_CHECK = 0
+				                                           AND 	B.SBJ_NUM = #{sbjNum}
+		                                           )U
+		                                           GROUP BY U.AT_STU_NUM
+		                                        )B
+		                        ON(B.AT_STU_NUM = E.AT_STU_NUM)
+		                        GROUP BY    E.AT_STU_NUM
+		                                  , NVL(T.ATTEND, 0)
+		                                  , NVL(L.LATE, 0)
+		                                  , NVL(B.ABSENT, 0)
+		      				)X
+		      ON(X.AT_STU_NUM = S.STU_NUM)
+		      INNER JOIN DEPARTMENT P
+		      ON(P.DEPT_NUM = S.DEPT_NUM)
+		      INNER JOIN COURSE_LIST C
+		      ON(C.STU_NUM = S.STU_NUM)
+		      WHERE C.SBJ_NUM = #{sbjNum}
+		      ORDER BY S.STU_NM_KOR ASC
+			)O
+		LEFT OUTER JOIN (
+				              SELECT A.STU_NUM, K.TIME_TCODE, K.AT_WEEK, NVL(K.AT_CHECK,2) AS AT_CHECK
+				              FROM STUDENT A
+				              LEFT OUTER JOIN(
+								                  SELECT
+										                  	D.SBJ_NUM,
+										                  	SUBSTR(D.TIME_TCODE,1,3) AS TIME_TCODE,
+										                  	E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+								                  FROM 		LECTURE_TM D
+								                  LEFT OUTER JOIN ATTENDANCE E
+								                  ON(E.LT_NUM = D.LT_NUM)
+								                  WHERE 	D.SBJ_NUM = #{sbjNum}
+								                  GROUP BY 	D.SBJ_NUM,
+								                  			SUBSTR(D.TIME_TCODE,1,3),
+								                  			E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+					                  		) K
+				              ON(K.AT_STU_NUM = A.STU_NUM)
+				              INNER JOIN COURSE_LIST B
+				              ON(B.STU_NUM = A.STU_NUM)
+				              INNER JOIN DEPARTMENT C
+				              ON(C.DEPT_NUM = A.DEPT_NUM)
+				              WHERE 	B.SBJ_NUM = #{sbjNum}
+				              ORDER BY 	A.STU_NM_KOR
+				                     	, K.AT_WEEK
+		              )J
+		ON(O.STU_NUM = J.STU_NUM)
+		WHERE	O.CL_SEMESTER = '2023-01'
+	</select>
+
+	<!-- 과목별 수강생 목록 및 출석현황(원본) -->
+	<select id="getAtList_origin" parameterType="String" resultMap="attendanceMap">
+		SELECT O.*, J.TIME_TCODE, J.AT_WEEK, J.AT_CHECK
+		FROM (
+		        SELECT DISTINCT S.STU_NM_KOR, S.STU_NUM, P.DEPT_NM, NVL(X.ATTEND,0) AS ATTEND, NVL(X.LATE,0) AS LATE, NVL(X.ABSENT,0) AS ABSENT
+		        FROM STUDENT S
+		        LEFT OUTER JOIN(
+				                    SELECT
+				                            E.AT_STU_NUM AS AT_STU_NUM--, E.AT_WEEK, E.AT_CHECK
+				                          , NVL(T.ATTEND, 0) AS ATTEND
+				                          , NVL(L.LATE, 0) AS LATE
+				                          , NVL(B.ABSENT, 0) AS ABSENT
+				                    FROM    ATTENDANCE E
+				                    LEFT OUTER JOIN (
+				                                       --SELECT A.AT_STU_NUM, COUNT(AT_CHECK) AS ATTEND, B.SBJ_NUM
+				                                       SELECT U.AT_STU_NUM, COUNT(U.AT_CHECK) AS ATTEND
+				                                       FROM(
+				                                       SELECT DISTINCT A.AT_STU_NUM, B.SBJ_NUM, A.AT_WEEK, A.AT_CHECK
+				                                       FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK, LT_NUM
+				                                             FROM ATTENDANCE
+				                                             ORDER BY 1)A
+				                                       LEFT OUTER JOIN LECTURE_TM B
+				                                       ON(B.LT_NUM = A.LT_NUM)
+				                                       WHERE A.AT_CHECK = 1
+				                                       AND B.SBJ_NUM = #{sbjNum}
+				                                       )U
+				                                       GROUP BY U.AT_STU_NUM
+				                                       --GROUP BY A.AT_STU_NUM, B.SBJ_NUM
+				                                    )T
+				                    ON(T.AT_STU_NUM = E.AT_STU_NUM)
+				                    LEFT OUTER JOIN (
+				                                       SELECT U.AT_STU_NUM, COUNT(U.AT_CHECK) AS LATE
+				                                       FROM(
+				                                       SELECT DISTINCT A.AT_STU_NUM, B.SBJ_NUM, A.AT_WEEK, A.AT_CHECK
+				                                       FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK, LT_NUM
+				                                             FROM ATTENDANCE
+				                                             ORDER BY 1)A
+				                                       LEFT OUTER JOIN LECTURE_TM B
+				                                       ON(B.LT_NUM = A.LT_NUM)
+				                                       WHERE A.AT_CHECK = 0.67
+				                                       AND B.SBJ_NUM = #{sbjNum}
+				                                       )U
+				                                       GROUP BY U.AT_STU_NUM
+				                                    )L
+				                    ON(L.AT_STU_NUM = E.AT_STU_NUM)
+				                    LEFT OUTER JOIN (
+				                                       SELECT U.AT_STU_NUM, COUNT(U.AT_CHECK) AS ABSENT
+				                                       FROM(
+				                                       SELECT DISTINCT A.AT_STU_NUM, B.SBJ_NUM, A.AT_WEEK, A.AT_CHECK
+				                                       FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK, LT_NUM
+				                                             FROM ATTENDANCE
+				                                             ORDER BY 1)A
+				                                       LEFT OUTER JOIN LECTURE_TM B
+				                                       ON(B.LT_NUM = A.LT_NUM)
+				                                       WHERE A.AT_CHECK = 0
+				                                       AND B.SBJ_NUM = #{sbjNum}
+				                                       )U
+				                                       GROUP BY U.AT_STU_NUM
+				                                    )B
+				                    ON(B.AT_STU_NUM = E.AT_STU_NUM)
+				                    GROUP BY    E.AT_STU_NUM
+				                              , NVL(T.ATTEND, 0)
+				                              , NVL(L.LATE, 0)
+				                              , NVL(B.ABSENT, 0)
+		        )X
+		        ON(X.AT_STU_NUM = S.STU_NUM)
+		        INNER JOIN DEPARTMENT P
+		        ON(P.DEPT_NUM = S.DEPT_NUM)
+		        INNER JOIN COURSE_LIST C
+		        ON(C.STU_NUM = S.STU_NUM)
+		        WHERE C.SBJ_NUM = #{sbjNum}
+		        ORDER BY S.STU_NM_KOR ASC
+		    )O
+		LEFT OUTER JOIN (
+
+		                SELECT A.STU_NUM, K.TIME_TCODE, K.AT_WEEK, NVL(K.AT_CHECK,2) AS AT_CHECK
+		                FROM STUDENT A
+		                LEFT OUTER JOIN(
+		                    SELECT
+		                    D.SBJ_NUM,
+		                    SUBSTR(D.TIME_TCODE,1,3) AS TIME_TCODE,
+		                    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		                    FROM LECTURE_TM D
+		                    LEFT OUTER JOIN ATTENDANCE E
+		                    ON(E.LT_NUM = D.LT_NUM)
+		                    WHERE D.SBJ_NUM = #{sbjNum}
+		                    GROUP BY D.SBJ_NUM,
+		                    SUBSTR(D.TIME_TCODE,1,3),
+		                    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+
+		                    ) K
+		                ON(K.AT_STU_NUM = A.STU_NUM)
+		                INNER JOIN COURSE_LIST B
+		                ON(B.STU_NUM = A.STU_NUM)
+		                INNER JOIN DEPARTMENT C
+		                ON(C.DEPT_NUM = A.DEPT_NUM)
+		                WHERE B.SBJ_NUM = #{sbjNum}
+		                ORDER BY A.STU_NM_KOR
+		                       , K.AT_WEEK
+		                )J
+		ON(O.STU_NUM = J.STU_NUM)
+	</select>
+
+	<!-- ltNum 출력 -->
+	<select id="getLtNum" parameterType="hashMap" resultType="HashMap">
+		SELECT LT_NUM
+		FROM LECTURE_TM
+		WHERE SBJ_NUM = #{sbjNum}
+		AND SUBSTR(TIME_TCODE,1,3) = #{timeTcode}
+	</select>
+
+	<!-- 출석 insert 또는 update -->
+	<update id="updateAttendance" parameterType="java.util.List">
+		MERGE INTO ATTENDANCE A
+		USING(
+			<foreach collection="list" item="atList" open="" close="" index="index" separator="UNION">
+				SELECT
+					#{atList.ltNum} as ltNum,
+					#{atList.atWeek} as atWeek,
+					#{atList.atStuNum} as atStuNum,
+					#{atList.atCheck} as atCheck
+				FROM DUAL
+			</foreach>
+			)T
+			ON(		A.LT_NUM = T.ltNum
+			    AND A.AT_WEEK = T.atWeek
+			    AND A.AT_STU_NUM = T.atStuNum)
+			WHEN MATCHED THEN
+			    UPDATE SET A.AT_CHECK = T.atCheck
+
+			WHEN NOT MATCHED THEN
+			    INSERT (AT_NUM, LT_NUM, AT_WEEK, AT_STU_NUM, AT_CHECK)
+			    VALUES(
+			    		SEQ_ATTENDANCE.NEXTVAL, T.ltNum, T.atWeek, T.atStuNum, T.atCheck
+		)
+	</update>
+
+	<!-- (학생) 기본정보 및 출석현황 조회 -->
+	<resultMap type="courseAttendanceVO" id="attendanceMap2">
+		<result property="stuNmKor" column="STU_NM_KOR" />
+		<result property="stuNum" column="STU_NUM" />
+		<result property="deptNm" column="DEPT_NM" />
+		<result property="attend" column="ATTEND" />
+		<result property="late" column="LATE" />
+		<result property="absent" column="ABSENT" />
+		<collection property="atList" resultMap="atListMap2"></collection>
+	</resultMap>
+
+	<resultMap type="CourseAtListVO" id="atListMap2">
+		<result property="stuNum" column="STU_NUM" />
+		<result property="timeTcode" column="TIME_TCODE" />
+		<result property="atWeek" column="AT_WEEK" />
+		<result property="atCheck" column="AT_CHECK" />
+	</resultMap>
+	<select id="getStuAttendList" parameterType="HashMap" resultMap="attendanceMap2">
+		SELECT O.*, J.TIME_TCODE, J.AT_WEEK, J.AT_CHECK
+		FROM (
+		        SELECT DISTINCT S.STU_NM_KOR, S.STU_NUM, P.DEPT_NM, X.ATTEND, X.LATE, X.ABSENT
+		        FROM STUDENT S
+		        LEFT OUTER JOIN(
+		                    SELECT
+		                            E.AT_STU_NUM AS AT_STU_NUM--, E.AT_WEEK, E.AT_CHECK
+		                          , NVL(T.ATTEND, 0) AS ATTEND
+		                          , NVL(L.LATE, 0) AS LATE
+		                          , NVL(B.ABSENT, 0) AS ABSENT
+		                    FROM    ATTENDANCE E
+		                    LEFT OUTER JOIN (
+		                                       SELECT A.AT_STU_NUM, COUNT(AT_CHECK) AS ATTEND
+		                                       FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK
+		                                             FROM ATTENDANCE
+		                                             ORDER BY 1)A
+		                                       WHERE A.AT_CHECK = 1
+		                                       GROUP BY A.AT_STU_NUM)T
+		                    ON(T.AT_STU_NUM = E.AT_STU_NUM)
+		                    LEFT OUTER JOIN (
+		                                        SELECT A.AT_STU_NUM, COUNT(AT_CHECK) AS LATE
+		                                        FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK
+		                                             FROM ATTENDANCE
+		                                             ORDER BY 1)A
+		                                        WHERE A.AT_CHECK = 0.67
+		                                        GROUP BY A.AT_STU_NUM)L
+		                    ON(L.AT_STU_NUM = E.AT_STU_NUM)
+		                    LEFT OUTER JOIN (
+		                                        SELECT A.AT_STU_NUM, COUNT(AT_CHECK) AS ABSENT
+		                                        FROM(SELECT DISTINCT AT_STU_NUM, AT_WEEK, AT_CHECK
+		                                             FROM ATTENDANCE
+		                                             ORDER BY 1)A
+		                                        WHERE A.AT_CHECK = 0
+		                                        GROUP BY A.AT_STU_NUM)B
+		                    ON(B.AT_STU_NUM = E.AT_STU_NUM)
+		                    GROUP BY    E.AT_STU_NUM
+		                              , NVL(T.ATTEND, 0)
+		                              , NVL(L.LATE, 0)
+		                              , NVL(B.ABSENT, 0)
+		        )X
+		        ON(X.AT_STU_NUM = S.STU_NUM)
+		        INNER JOIN DEPARTMENT P
+		        ON(P.DEPT_NUM = S.DEPT_NUM)
+		        INNER JOIN COURSE_LIST C
+		        ON(C.STU_NUM = S.STU_NUM)
+		        WHERE C.SBJ_NUM = #{sbjNum}
+		        ORDER BY S.STU_NM_KOR ASC
+		    )O
+		LEFT OUTER JOIN (
+
+		                SELECT A.STU_NUM, K.TIME_TCODE, K.AT_WEEK, NVL(K.AT_CHECK,2) AS AT_CHECK
+		                FROM STUDENT A
+		                LEFT OUTER JOIN(
+		                    SELECT
+		                    D.SBJ_NUM,
+		                    SUBSTR(D.TIME_TCODE,1,3) AS TIME_TCODE,
+		                    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		                    FROM LECTURE_TM D
+		                    LEFT OUTER JOIN ATTENDANCE E
+		                    ON(E.LT_NUM = D.LT_NUM)
+		                    GROUP BY D.SBJ_NUM,
+		                    SUBSTR(D.TIME_TCODE,1,3),
+		                    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		                    ) K
+		                ON(K.AT_STU_NUM = A.STU_NUM)
+		                INNER JOIN COURSE_LIST B
+		                ON(B.STU_NUM = A.STU_NUM)
+		                INNER JOIN DEPARTMENT C
+		                ON(C.DEPT_NUM = A.DEPT_NUM)
+		                WHERE B.SBJ_NUM = #{sbjNum}
+		                ORDER BY A.STU_NM_KOR
+		                       , K.AT_WEEK
+		                )J
+		ON(O.STU_NUM = J.STU_NUM)
+		WHERE O.STU_NUM = #{stuNum}
+	</select>
+
+	<!-- (학생)개별학생 출석 조회(주차별)  -->
+	<select id="getStuAtList2" parameterType="hashMap" resultType="hashMap">
+		SELECT A.STU_NUM, A.STU_NM_KOR,K.TIME_TCODE, K.AT_WEEK, NVL(K.AT_CHECK,2) AS AT_CHECK
+		FROM STUDENT A
+		LEFT OUTER JOIN(
+		    SELECT
+		    D.SBJ_NUM,
+		    SUBSTR(D.TIME_TCODE,1,3) AS TIME_TCODE,
+		    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		    FROM LECTURE_TM D
+		    LEFT OUTER JOIN ATTENDANCE E
+		    ON(E.LT_NUM = D.LT_NUM)
+		    GROUP BY D.SBJ_NUM,
+		    SUBSTR(D.TIME_TCODE,1,3),
+		    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		    ) K
+		ON(K.AT_STU_NUM = A.STU_NUM)
+		INNER JOIN COURSE_LIST B
+		ON(B.STU_NUM = A.STU_NUM)
+		INNER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = A.DEPT_NUM)
+		WHERE B.SBJ_NUM = #{sbjNum}
+		AND A.STU_NUM = #{stuNum}
+		AND K.AT_WEEK BETWEEN #{start} AND #{end}
+		ORDER BY A.STU_NM_KOR
+		       , K.AT_WEEK
+	</select>
+
+	<!-- 학생정보 조회 -->
+	<select id="basicStuInfo" parameterType="int" resultType="hashMap">
+		SELECT  C.STU_NUM, C.STU_NM_KOR, C.STU_STATUS,D.DEPT_NUM, D.DEPT_NM
+		      , NVL(STU_MINOR,0) AS STU_MINOR
+		FROM    STUDENT C
+		INNER JOIN DEPARTMENT D
+		ON(D.DEPT_NUM = C.DEPT_NUM)
+		WHERE   STU_NUM = #{stuNum}
+	</select>
+
+	<!-- (학생)개별학생 출석 조회(주차별) (*최종) -->
+	<select id="getStuAtList" parameterType="hashMap" resultType="hashMap">
+		SELECT 	DISTINCT A.STU_NUM, A.STU_NM_KOR,K.TIME_TCODE, K.AT_WEEK, NVL(K.AT_CHECK,2) AS AT_CHECK
+		FROM STUDENT A
+		LEFT OUTER JOIN(
+						    SELECT
+						    D.SBJ_NUM,
+						    SUBSTR(D.TIME_TCODE,1,3) AS TIME_TCODE,
+						    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+						    FROM LECTURE_TM D
+						    LEFT OUTER JOIN ATTENDANCE E
+						    ON(E.LT_NUM = D.LT_NUM)
+						    WHERE D.SBJ_NUM = #{sbjNum}
+						    GROUP BY D.SBJ_NUM,
+						    SUBSTR(D.TIME_TCODE,1,3),
+						    E.AT_WEEK, E.AT_CHECK ,E.AT_STU_NUM
+		    			) K
+		ON(K.AT_STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN COURSE_LIST B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = A.DEPT_NUM)
+		WHERE 	A.STU_NUM = #{stuNum}
+		AND 	K.AT_WEEK BETWEEN #{start} AND #{end}
+		ORDER BY A.STU_NM_KOR
+		       , K.AT_WEEK
+	</select>
+
+	<!-- 성적 입력 시 해당하는 과목의 제목 가져오기(신동준) -->
+	<select id="getSubjectInfo" parameterType="string" resultType="string">
+		SELECT SBJ_TITLE
+		FROM SUBJECT
+		WHERE SBJ_NUM = #{sbjNum}
+	</select>
+
+	<!-- 해당 과목의 수강생 리스트를 가져 온 뒤 성적을 기입할려고 리스트를 가져옴(신동준) -->
+	<select id="getCourseListInfo" parameterType="string" resultType="courseListVO">
+
+		SELECT ROW_NUMBER() OVER(ORDER BY A.STU_NUM) RNUM , A.SBJ_NUM ,A.STU_NUM, B.STU_NM_KOR , C.DEPT_NM , B.STU_PN
+			FROM COURSE_LIST A , STUDENT B , DEPARTMENT C
+			WHERE
+			A.STU_NUM = B.STU_NUM
+			AND
+			B.DEPT_NUM = C.DEPT_NUM
+			AND
+			A.SBJ_NUM = #{sbjNum}
+			AND
+			A.CL_SEMESTER  = '2023-01'
+	</select>
+
+	<select id="getWeekSum" parameterType="hashMap" resultType="subjectVO">
+		SELECT A.AT_WEEK ,
+		       C.SBJ_TITLE ,
+		       A.AT_STU_NUM ,
+		       A.AT_CHECK,
+		       SUM(A.AT_CHECK) SUM_AT_CHECK,
+		       SUM(A.AT_WEEK) SUM_AT_WEEK
+		FROM ATTENDANCE A , LECTURE_TM B , SUBJECT C
+		WHERE A.LT_NUM = B.LT_NUM
+		AND
+		B.SBJ_NUM = C.SBJ_NUM
+		AND
+		A.AT_STU_NUM = #{stuNum}
+		AND
+		C.SBJ_NUM = #{sbjNum}
+		GROUP BY  ROLLUP( A.AT_STU_NUM, (C.SBJ_TITLE ,A.AT_WEEK , A.AT_CHECK))
+		HAVING A.AT_STU_NUM IS NULL
+	</select>
+
+	<select id="getRcNum" parameterType="hashMap" resultType="String">
+		SELECT RC_NUM
+					FROM REPORT_CARD
+					WHERE CL_NUM = (SELECT CL_NUM
+					                  FROM COURSE_LIST
+					                 WHERE SBJ_NUM = (select sbj_num
+		                                                from subject
+		                                                where sbj_title = #{sbjTitle}) AND STU_NUM = #{stuNum})
+					AND
+					SBJ_NUM = (select sbj_num
+		                        from subject
+		                       where sbj_title = #{sbjTitle})
+					AND
+					STU_NUM = #{stuNum}
+	</select>
+
+	<update id="insertReportCardAndCsfscore" parameterType="hashMap">
+		MERGE INTO REPORT_CARD A
+		USING DUAL
+		ON(A.RC_NUM = #{rcNum})
+		WHEN MATCHED THEN
+			UPDATE SET RC_ATTSCORE=#{attScore}, RC_MTEST=#{mtest}, RC_FTEST=#{ftest}, RC_HW=#{hw}, RC_ETC=#{etc}, RC_FSCORE=#{fscore}
+		WHEN NOT MATCHED THEN
+			INSERT(RC_NUM, CL_NUM, SBJ_NUM, STU_NUM, RC_ATTSCORE, RC_MTEST, RC_FTEST, RC_HW, RC_ETC, RC_FSCORE)
+			VALUES( (SELECT TO_CHAR(NVL(MAX(TO_NUMBER(RC_NUM))+1,1))
+                    FROM REPORT_CARD),
+									(SELECT CL_NUM
+										FROM COURSE_LIST
+										WHERE
+										SBJ_NUM=#{sbjNum}
+										AND
+										STU_NUM = #{stuNum}
+										AND
+										CL_SEMESTER = (SELECT MAX(CL_SEMESTER)
+										                    FROM COURSE_LIST
+										            WHERE STU_NUM = #{stuNum})) , #{sbjNum}, #{stuNum} , #{attScore} , #{mtest} , #{ftest}, #{hw} , #{etc}, #{fscore})
+
+
+	</update>
+
+
+	<update id="insertReportCardAndCsfscore2" parameterType="hashMap">
+		MERGE INTO REPORT_CARD A
+		USING DUAL
+		ON(A.RC_NUM = #{rcNum})
+		WHEN MATCHED THEN
+			UPDATE SET RC_ATTSCORE=#{attScore}, RC_MTEST=#{mtest}, RC_FTEST=#{ftest}, RC_HW=#{hw}, RC_ETC=#{etc}, RC_FSCORE=#{fscore}
+		WHEN NOT MATCHED THEN
+			INSERT(RC_NUM, CL_NUM, SBJ_NUM, STU_NUM, RC_ATTSCORE, RC_MTEST, RC_FTEST, RC_HW, RC_ETC, RC_FSCORE)
+			VALUES( (SELECT TO_CHAR(NVL(MAX(TO_NUMBER(RC_NUM))+1,1))
+                    FROM REPORT_CARD),
+									(SELECT CL_NUM
+										FROM COURSE_LIST
+										WHERE
+										SBJ_NUM=(select sbj_num
+												from subject
+												where sbj_title = #{sbjTitle})
+										AND
+										STU_NUM = #{stuNum}
+										AND
+										CL_SEMESTER = (SELECT MAX(CL_SEMESTER)
+										                    FROM COURSE_LIST
+										            WHERE STU_NUM = #{stuNum})) , (select sbj_num
+																					from subject
+																					where sbj_title = #{sbjTitle}), #{stuNum} , #{attScore} , #{mtest} , #{ftest}, #{hw} , #{etc}, #{fscore})
+
+
+	</update>
+
+	<update id="updateClFscore" parameterType="hashMap">
+		 UPDATE COURSE_LIST SET
+				 CL_FSCORE=#{finalScore}
+				 WHERE SBJ_NUM = #{sbjNum}
+				 AND
+				 STU_NUM = #{stuNum}
+				 AND
+				 CL_SEMESTER = (SELECT MAX(CL_SEMESTER)
+				                  FROM COURSE_LIST
+				                  WHERE SBJ_NUM = #{sbjNum} AND STU_NUM =#{stuNum})
+	</update>
+
+	<select id="getCourseInfo" parameterType="hashMap" resultType="reportCardVO">
+				SELECT B.DEPT_NM ,
+		          A.STU_NUM ,
+		          CASE WHEN A.STU_SEMESTER=1 THEN '1'
+		               WHEN A.STU_SEMESTER=2 THEN '1'
+		               WHEN A.STU_SEMESTER=3 THEN '2'
+		               WHEN A.STU_SEMESTER=4 THEN '2'
+		               WHEN A.STU_SEMESTER=5 THEN '3'
+		               WHEN A.STU_SEMESTER=6 THEN '3'
+		               WHEN A.STU_SEMESTER=7 THEN '4'
+		               WHEN A.STU_SEMESTER=8 THEN '4'
+		               ELSE '초과학기'
+		               END STU_SEMESTER,
+
+		           A.STU_NM_KOR,
+		           C.RC_ATTSCORE, C.RC_MTEST, C.RC_FTEST, C.RC_HW, C.RC_ETC, C.RC_FSCORE, D.GO_REASON,
+		            D.GO_LIST,D.GO_REPLY , D.SBJ_NUM
+		      FROM STUDENT A , DEPARTMENT B , REPORT_CARD C , GRADE_OBJC D
+		      WHERE
+		      A.DEPT_NUM = B.DEPT_NUM
+		      AND
+		      A.STU_NUM = C.STU_NUM
+		        AND
+		        C.SBJ_NUM = D.SBJ_NUM(+)
+		      AND
+		      A.STU_NUM = #{stuNum}
+		      AND
+		      C.SBJ_NUM = (SELECT SBJ_NUM FROM SUBJECT WHERE SBJ_TITLE = #{sbjNum})
+	</select>
+
+
+	<select id="getRcNum2" parameterType="hashMap" resultType="String">
+		SELECT RC_NUM
+			FROM REPORT_CARD
+			WHERE CL_NUM = (SELECT CL_NUM
+			                  FROM COURSE_LIST
+			                 WHERE SBJ_NUM = (SELECT SBJ_NUM FROM SUBJECT WHERE SBJ_TITLE=#{sbjTitle}) AND STU_NUM = #{stuNum})
+			AND
+			SBJ_NUM = (SELECT SBJ_NUM FROM SUBJECT WHERE SBJ_TITLE=#{sbjTitle})
+			AND
+			STU_NUM = #{stuNum}
+	</select>
+	
+	  <select id="studentInfo" parameterType="hashMap" resultType="stuVO">
+	      SELECT STU_NUM, DEPT_NUM, STU_NM_KOR, STU_NM_ENG, STU_REG1, STU_REG2,
+	             STU_EMAIL, STU_PN, STU_PHOTO, STU_MS, STU_HDC, STU_NATION,
+	             STU_ZIP, STU_ADDR1, STU_ADDR2, STU_MINOR, STU_DMAJOR, STU_BANK,
+	             STU_ACCOUNT, STU_STATUS, STU_SEMESTER
+	          FROM STUDENT
+	         WHERE STU_NUM = #{stuNum}
+	   </select>
+	
+</mapper>
+
+
+
+
+
+
+
+
+

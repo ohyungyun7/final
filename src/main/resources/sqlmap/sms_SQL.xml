@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+  
+<mapper namespace="kr.or.ddit.mapper.SmsMapper">
+
+	<insert id="insertSms" parameterType="HashMap">
+		<selectKey resultType="int" order="BEFORE" keyProperty="smsNum">
+			select nvl(max(SMS_NUM),0)+1 FROM SMS
+		</selectKey>
+		
+		INSERT INTO SMS
+		(SMS_NUM, SMS_CONTENT, SMS_DT, SMS_PN, SMS_NM)
+		VALUES
+		(#{smsNum}, #{smsContent}, sysdate, #{smsPn}, #{smsNm})	
+	</insert>
+</mapper>

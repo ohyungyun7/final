@@ -1,0 +1,245 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.GradeMapper">
+
+	<!-- 학생 -->
+	<select id="getStudentInfo" parameterType="int" resultType="stuVO">
+		SELECT STU_NUM, DEPT_NUM, STU_NM_KOR, STU_NM_ENG, STU_REG1, STU_REG2,
+		       STU_EMAIL, STU_PN, STU_PHOTO, STU_MS, STU_HDC, STU_NATION,
+		       STU_ZIP, STU_ADDR1, STU_ADDR2, STU_MINOR, STU_DMAJOR, STU_BANK,
+		       STU_ACCOUNT, STU_STATUS, STU_SEMESTER
+		FROM STUDENT
+		WHERE STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 해당 학생의 현재까지의 학점총점 , 학점의 갯수 , 학점의 총 평균을 가져오기-->
+	<select id="avgScore" parameterType="int" resultType="courseListVO">
+
+		 select t.CL_FSCORE , t.COUNT_FSCORE , T.SBJ_RECODE
+			from(
+			    select A.stu_num , sum(A.CL_FSCORE) CL_FSCORE , count(A.cl_fscore) COUNT_FSCORE , SUM(B.SBJ_RECODE) SBJ_RECODE
+			    from course_list A , SUBJECT B
+			    where stu_num = #{stuNum}
+                AND
+                A.SBJ_NUM = B.SBJ_NUM
+                AND
+                B.DEPT_NUM !=0
+                and
+                a.CL_FSCORE is not null
+			    group by A.stu_num
+			) t
+        group by t.CL_FSCORE , t.COUNT_FSCORE ,T.SBJ_RECODE
+	</select>
+
+	<select id="totalAvg" parameterType="int" resultType="courseListVO">
+		select t.CL_FSCORE , t.COUNT_FSCORE, round((t.CL_FSCORE/t.COUNT_FSCORE),2) AVG_CL_FSCORE
+				from(
+				    select stu_num , sum(CL_FSCORE) CL_FSCORE , count(cl_fscore) COUNT_FSCORE
+				    from course_list
+				    where stu_num = #{stuNum}
+				    group by stu_num
+				) t
+			group by t.CL_FSCORE , t.COUNT_FSCORE
+	</select>
+
+
+	<!-- 해당 학생의 교양학점 가져오기 -->
+	<select id="kyoYangScore" parameterType="int" resultType="courseListVO">
+		SELECT B.CL_SEMESTER ,A.DEPT_NUM ,A.SBJ_TITLE , sum(a.sbj_recode) SUM_RECODE
+		    FROM SUBJECT A , COURSE_LIST B
+		    WHERE A.SBJ_NUM = B.SBJ_NUM
+		    AND
+		    B.STU_NUM = #{stuNum}
+		    AND
+		    A.DEPT_NUM = 0
+		    and
+            b.CL_FSCORE is not null
+            group by  rollup(B.CL_SEMESTER ,A.DEPT_NUM ,A.SBJ_TITLE)
+            having b.cl_semester is null
+	</select>
+
+	<!-- 내가 수강한 학기 중복제거로 가저오기 -->
+	<select id="myClsemesterList" parameterType="int" resultType="courseListVO">
+		SELECT distinct(CL_SEMESTER)
+			FROM COURSE_LIST
+			WHERE STU_NUM = #{stuNum}
+			ORDER BY CL_SEMESTER desc
+	</select>
+
+
+	  <select id="myCourseListtt" parameterType="int" resultType="courseListVO">
+		  select c.CL_SEMESTER ,
+				              c.SBJ_RS,
+				              c.SBJ_RECODE,
+				              c.AGRADE ,
+				              c.CL_FSCORE,
+				              c.SBJ_TITLE ,
+				              c.SUMCL_SEMESTER ,
+				              c.SUMSBJ_RECODE ,
+				              TRUNC(c.AVGCL_FSCOREE,1) AVGCL_FSCOREE,
+				              CASE WHEN C.RSLT IS NULL THEN '18'
+				                   WHEN C.RSLT  <![CDATA[<]]> 3.0  THEN '18'
+				                   WHEN C.RSLT  <![CDATA[<]]> 4.0  THEN '21'
+				                   WHEN C.RSLT  <![CDATA[<]]> 4.5  THEN '24'
+				                   END RSLT
+						from
+						    (
+
+						        SELECT X.CL_SEMESTER, X.SBJ_RS, X.SBJ_RECODE,X.AGRADE,X.CL_FSCORE,X.SBJ_TITLE,X.SUMCL_SEMESTER,X.SUMSBJ_RECODE,X.AVGCL_FSCOREE
+				                        , Y.RSLT
+				                   FROM
+				                   (
+				                   SELECT B.CL_SEMESTER ,
+				                      B.SBJ_RS,
+				                      B.SBJ_RECODE,
+				                      B.AGRADE ,
+				                      B.CL_FSCORE,
+				                      B.SBJ_TITLE ,
+				                      COUNT(B.CL_SEMESTER) SUMCL_SEMESTER ,
+				                      sum(B.SBJ_RECODE) SUMSBJ_RECODE ,
+				                      avg(B.CL_FSCORE) AVGCL_FSCOREE
+				                   FROM
+				                   (
+				                      SELECT  A.CL_SEMESTER,
+		                                       case when B.SBJ_RS = 0 THEN '교양필수'
+		                                            when B.SBJ_RS = 1 THEN '전공필수'
+				                                    when B.SBJ_RS = 2 THEN '전공선택'
+				                               END SBJ_RS,
+				                               b.SBJ_RECODE,
+				                               TRIM(TRUNC(a.CL_FSCORE, 1)) CL_FSCORE,
+				                               case when CL_FSCORE = 4.5  then 'A+'
+				                                    when CL_FSCORE = 4.0  then 'A'
+				                                    when CL_FSCORE = 3.5  then 'B+'
+				                                    when CL_FSCORE = 3.0  then 'B'
+				                                    when CL_FSCORE = 2.5  then 'C+'
+				                                    when CL_FSCORE = 2.0  then 'C'
+				                                    when CL_FSCORE = 1.5  then 'D+'
+				                                    when CL_FSCORE = 1.0  then 'D'
+				                                    ELSE 'F'
+				                                    END AGRADE
+				                               , B.SBJ_TITLE
+				                            FROM COURSE_LIST A , SUBJECT B
+				                            WHERE A.SBJ_NUM = B.SBJ_NUM
+				                            AND
+				                            A.STU_NUM =  #{stuNum}
+				                               ORDER BY A.CL_SEMESTER DESC) B
+				                       GROUP BY ROLLUP(B.CL_SEMESTER ,(B.SBJ_RS, B.SBJ_RECODE, B.AGRADE, B.CL_FSCORE, B.SBJ_TITLE))
+				                   ) X,
+				                   (
+				                       SELECT  A.CL_SEMESTER
+				                            ,  TRUNC(AVG(a.CL_FSCORE),1) CL_FSCORE
+				                            ,  LEAD(TRUNC(AVG(a.CL_FSCORE),1)) OVER (ORDER BY A.CL_SEMESTER DESC) RSLT
+				                       FROM COURSE_LIST A , SUBJECT B
+				                       WHERE A.SBJ_NUM = B.SBJ_NUM
+				                       AND   A.STU_NUM = #{stuNum}
+				                       GROUP BY A.CL_SEMESTER
+				                   ) Y
+				                   WHERE X.CL_SEMESTER = Y.CL_SEMESTER
+						     ) c
+						 where c.CL_SEMESTER is not null
+				            AND
+				            C.AVGCL_FSCOREE IS NOT NULL
+						 group by  c.CL_SEMESTER ,
+				                      c.SBJ_RS,
+				                      c.SBJ_RECODE,
+				                      c.AGRADE ,
+				                      c.CL_FSCORE,
+				                      c.SBJ_TITLE ,
+				                      c.SUMCL_SEMESTER ,
+				                      c.SUMSBJ_RECODE ,
+				                      c.AVGCL_FSCOREE,
+				                      C.RSLT
+						 order by c.CL_SEMESTER desc
+
+	</select>
+
+	<select id="willMajor" parameterType="int" resultType="courseListVO">
+		SELECT A.SBJ_NUM, A.STU_NUM ,A.CL_SEMESTER, A.CL_FSCORE , B.DEPT_NUM , SUM(SBJ_RECODE) SBJ_RECODE
+			FROM COURSE_LIST A , SUBJECT B
+			WHERE
+			A.SBJ_NUM = B.SBJ_NUM
+			AND
+			STU_NUM =  #{stuNum}
+			AND
+			CL_FSCORE IS NULL
+			AND
+			DEPT_NUM != 0
+			GROUP BY  ROLLUP(A.SBJ_NUM, (A.STU_NUM ,A.CL_SEMESTER, A.CL_FSCORE , B.DEPT_NUM ,SBJ_RECODE))
+			HAVING A.SBJ_NUM IS NULL
+			ORDER BY CL_SEMESTER DESC
+	</select>
+
+ 	<select id="willKyoYang" parameterType="int" resultType="courseListVO">
+			SELECT A.SBJ_NUM, A.STU_NUM ,A.CL_SEMESTER, A.CL_FSCORE , B.DEPT_NUM , SUM(SBJ_RECODE) SBJ_RECODE
+				FROM COURSE_LIST A , SUBJECT B
+				WHERE
+				A.SBJ_NUM = B.SBJ_NUM
+				AND
+				STU_NUM =  #{stuNum}
+				AND
+				CL_FSCORE IS NULL
+				AND
+				DEPT_NUM = 0
+				GROUP BY  ROLLUP(A.SBJ_NUM, (A.STU_NUM ,A.CL_SEMESTER, A.CL_FSCORE , B.DEPT_NUM ,SBJ_RECODE))
+				HAVING A.SBJ_NUM IS NULL
+				ORDER BY CL_SEMESTER DESC
+	</select>
+
+	<select id="getThisStudentInfo" parameterType="int" resultType="courseListVO">
+			SELECT SUBSTR(B.CL_SEMESTER,1,4) CS_YEAR,
+					       SUBSTR(B.CL_SEMESTER,6,2) CS_SEMESTER,
+					       A.STU_NUM,
+			               A.STU_NM_KOR,
+					       COUNT(B.SBJ_NUM) COUNT_SBJ_NUM,
+					       SUM(C.SBJ_RECODE) SUM_SBJ_RECODE ,
+					       ROUND(AVG(CL_FSCORE),2) AVG_CL_FSCORE
+					FROM STUDENT A , COURSE_LIST B , SUBJECT C
+					WHERE
+					A.STU_NUM = B.STU_NUM
+					AND
+					A.STU_NUM = #{stuNum}
+					AND
+					B.SBJ_NUM = C.SBJ_NUM
+					AND
+					B.CL_SEMESTER = (SELECT MAX(CL_SEMESTER)
+					                   FROM COURSE_LIST
+					                   WHERE STU_NUM = #{stuNum})
+					GROUP BY  B.CL_SEMESTER, A.STU_NUM ,  A.STU_NM_KOR
+	</select>
+
+	<select id="getThisCourseList" parameterType="int" resultType="courseListVO">
+			SELECT CASE WHEN B.DEPT_NUM !=0 AND  B.SBJ_RS = 1 THEN '전공필수'
+	            WHEN B.DEPT_NUM !=0 AND  B.SBJ_RS = 2 THEN '전공선택'
+	            WHEN B.DEPT_NUM =0 AND  B.SBJ_RS = 1 THEN '교양필수'
+	            WHEN B.DEPT_NUM =0 AND  B.SBJ_RS = 2 THEN '교양선택'
+	            END
+		       SBJ_RS,
+		       B.SBJ_TITLE ,
+		       C.TEA_NM_KOR,
+		       B.SBJ_RECODE,
+		       TO_CHAR(A.CL_FSCORE, 'fm999,999,999,999,999,990.0') CL_FSCORE,
+		       CASE WHEN A.CL_FSCORE = 4.5 THEN 'A+'
+		            WHEN A.CL_FSCORE = 4.0 THEN 'A'
+		            WHEN A.CL_FSCORE = 3.5 THEN 'B+'
+		            WHEN A.CL_FSCORE = 3.0 THEN 'B'
+		            WHEN A.CL_FSCORE = 2.5 THEN 'C+'
+		            WHEN A.CL_FSCORE = 2.0 THEN 'C'
+		            WHEN A.CL_FSCORE = 1.5 THEN 'D+'
+		            WHEN A.CL_FSCORE = 1.0 THEN 'D'
+		            ELSE 'F'
+		            END SUB_FSCORE
+		FROM COURSE_LIST A , SUBJECT B , TEACHER C
+		WHERE
+		A.SBJ_NUM = B.SBJ_NUM
+		AND
+		B.TEA_NUM = C.TEA_NUM
+		AND
+		A.STU_NUM = #{stuNum}
+		AND
+		A.CL_SEMESTER = (SELECT MAX(CL_SEMESTER)
+		                   FROM COURSE_LIST
+		                  WHERE STU_NUM = #{stuNum})
+	</select>
+</mapper>

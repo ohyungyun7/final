@@ -1,0 +1,204 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace : xml파일이 여러개일 수 있으므로
+	이를 구별하기 위한 식별 용도로 사용
+ -->
+<mapper namespace="kr.or.ddit.mapper.GraduationMapper">
+
+	<!-- 학생 학적정보 출력 -->
+	<select id="getStuInfo" parameterType="int" resultType="hashMap">
+		SELECT  C.STU_NUM, C.STU_NM_KOR, C.STU_STATUS, D.DEPT_NUM, D.DEPT_NM
+		      , C.STU_SEMESTER
+		      , NVL(C.STU_DMAJOR,0) AS STU_DMAJOR
+		      , NVL(STU_MINOR,0) AS STU_MINOR
+		      , E.COLL_NM
+		      , (
+			        SELECT NVL(SUM(A.SBJ_RECODE),0) AS SUM_MAJOR
+			        FROM SUBJECT A
+			        LEFT OUTER JOIN COURSE_LIST B
+			        ON(B.SBJ_NUM = A.SBJ_NUM)
+			        WHERE DEPT_NUM IS NOT NULL
+			        AND B.STU_NUM = #{stuNum}
+			        AND B.CL_FSCORE > 0
+		        )AS MAJOR_RECODE
+		     , (
+			        SELECT NVL(SUM(A.SBJ_RECODE),0) AS SUM_ELECTIVE
+			        FROM SUBJECT A
+			        LEFT OUTER JOIN COURSE_LIST B
+			        ON(B.SBJ_NUM = A.SBJ_NUM)
+			        WHERE DEPT_NUM IS NULL
+			        AND B.STU_NUM = #{stuNum}
+			        AND B.CL_FSCORE > 0
+		        ) AS ELECTIVE_RECODE
+		      , (
+		      		SELECT NVL(B.DEPT_NM, '') AS DMAJOR_NM
+		            FROM STUDENT A
+		            LEFT OUTER JOIN DEPARTMENT B
+		            ON(B.DEPT_NUM = A.STU_DMAJOR)
+		            WHERE A.STU_NUM = #{stuNum}
+		        )AS DMAJOR_NM
+		      , (
+		      		SELECT NVL(B.DEPT_NM, '') AS MINOR_NM
+		            FROM STUDENT A
+		            LEFT OUTER JOIN DEPARTMENT B
+		            ON(B.DEPT_NUM = A.STU_MINOR)
+		            WHERE A.STU_NUM = #{stuNum}
+		        )AS MINOR_NM
+		FROM	STUDENT C
+		INNER JOIN DEPARTMENT D
+		ON(D.DEPT_NUM = C.DEPT_NUM)
+		INNER JOIN COLLEAGE E
+		ON(E.COLL_NUM = D.COLL_NUM)
+		WHERE	C.STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 전체학기 전공 이수학점 조회 -->
+	<select id="getSumMRecode" parameterType="hashMap" resultType="int">
+		SELECT	NVL(SUM(B.SBJ_RECODE),0) AS SUM_MS_RECODE
+		FROM	COURSE_LIST A
+		LEFT OUTER JOIN SUBJECT B
+		ON(B.SBJ_NUM = A.SBJ_NUM)
+		WHERE	A.STU_NUM = #{stuNum}
+		AND 	A.CL_FSCORE > 0
+		AND 	B.DEPT_NUM IS NOT NULL
+		AND 	B.SBJ_RS = #{sbjRs}
+	</select>
+
+	<!-- 금학기 전공 이수학점 조회 -->
+	<select id="getThisSumMRecode" parameterType="hashMap" resultType="int">
+		SELECT	NVL(SUM(B.SBJ_RECODE),0) AS SUM_MS_RECODE
+		FROM	COURSE_LIST A
+		LEFT OUTER JOIN SUBJECT B
+		ON(B.SBJ_NUM = A.SBJ_NUM)
+		WHERE	A.STU_NUM = #{stuNum}
+		AND		A.CL_FSCORE > 0
+		AND		B.DEPT_NUM IS NOT NULL
+		AND		B.SBJ_RS = #{sbjRs}
+		AND		A.CL_SEMESTER = '2023-01'
+	</select>
+
+	<!-- 전체학기 교양 이수학점 조회 -->
+	<select id="getSumERecode" parameterType="hashMap" resultType="int">
+		SELECT	NVL(SUM(B.SBJ_RECODE),0) AS SUM_ER_RECODE
+        FROM	COURSE_LIST A
+        LEFT OUTER JOIN SUBJECT B
+        ON(B.SBJ_NUM = A.SBJ_NUM)
+        WHERE	STU_NUM = #{stuNum}
+        AND		A.CL_FSCORE > 0
+        AND		B.DEPT_NUM IS NULL
+        AND		B.SBJ_RS = #{sbjRs}
+	</select>
+
+	<!-- 금학기 교양 이수학점 조회 -->
+	<select id="getThisSumERecode" parameterType="hashMap" resultType="int">
+		SELECT	NVL(SUM(B.SBJ_RECODE),0) AS SUM_ER_RECODE
+        FROM	COURSE_LIST A
+        LEFT OUTER JOIN SUBJECT B
+        ON(B.SBJ_NUM = A.SBJ_NUM)
+        WHERE	STU_NUM = #{stuNum}
+        AND		A.CL_FSCORE > 0
+        AND		B.DEPT_NUM IS NULL
+        AND		B.SBJ_RS = #{sbjRs}
+        AND		A.CL_SEMESTER = '2023-01'
+	</select>
+
+	<!-- 전체학기 평균평점 조회 -->
+	<select id="getAvgFscore" parameterType="int" resultType="hashMap">
+		SELECT  COUNT(CL_NUM) AS CNT
+		      , SUM(CL_FSCORE) AS SUM_FSCORE
+		      , ROUND((SUM(CL_FSCORE)/COUNT(CL_NUM)), 2) AS AVG_FSCORE
+		FROM	COURSE_LIST
+		WHERE	STU_NUM = #{stuNum}
+		AND		CL_FSCORE IS NOT NULL
+	</select>
+
+	<!-- F학점 갯수 조회 -->
+	<select id="getFCnt" parameterType="int" resultType="int">
+		SELECT	COUNT(CL_NUM)
+		FROM	COURSE_LIST
+		WHERE	CL_FSCORE = 0
+		AND 	STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 조기졸업 신청내역 조회(상태: 대기, 승인) -->
+	<select id="getEGHistory" parameterType="hashMap" resultType="int">
+		SELECT  COUNT(AC_NUM) AS CNT
+		FROM    ACADEMIC_CHG
+		WHERE   AC_LIST = 3
+		AND     AC_CHECK = #{acCheck}
+		AND     STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 조기졸업 신청 -->
+	<select id="appEG" parameterType="hashMap">
+		INSERT INTO ACADEMIC_CHG(
+		                            AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+		                          , AC_EDT, AC_CHECK, AC_COMRE
+		)VALUES(
+		            SEQ_ACADEMIC_CHANGE.NEXTVAL, #{stuNum}, #{acReason}, #{acList}, #{acSdt}
+		          , NULL, 0, NULL)
+	</select>
+
+	<!-- 조기졸업 신청목록 조회 -->
+	<select id="getAppEG" parameterType="int" resultType="AcademicVO">
+		SELECT  AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+		      , AC_EDT, AC_CHECK, AC_COMRE
+		FROM    ACADEMIC_CHG
+		WHERE   AC_LIST = 3
+		AND     STU_NUM = #{stuNum}
+		ORDER BY AC_NUM DESC
+	</select>
+
+	<!-- 조기졸업 신청 개별 건 조회 -->
+	<select id="getSingleAppEg" parameterType="hashMap" resultType="AcademicVO">
+		SELECT  AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+		      , AC_EDT, AC_CHECK, AC_COMRE
+		FROM    ACADEMIC_CHG
+		WHERE   AC_LIST = 3
+		AND     STU_NUM = #{stuNum}
+		AND     AC_NUM = #{acNum}
+	</select>
+
+	<!-- 졸업유예 신청목록 조회 -->
+	<select id="getAppGD" parameterType="int" resultType="hashMap">
+		SELECT	GP_NUM, STU_NUM, GP_DT, GP_CHECK, GP_COMRE
+		FROM	GRADUATION_POST
+		WHERE	STU_NUM = #{stuNum}
+		ORDER BY GP_NUM DESC
+	</select>
+
+	<!-- 졸업유예 신청 개별 건 조회 -->
+	<select id="getSingleAppGd" parameterType="hashMap" resultType="hashMap">
+		SELECT  GP_NUM, STU_NUM, GP_DT, GP_CHECK, GP_COMRE
+		FROM    GRADUATION_POST
+		WHERE   STU_NUM = #{stuNum}
+		AND     GP_NUM = #{gpNum}
+	</select>
+
+	<!-- 승인대기 상태인 졸업유예 신청 건 조회 -->
+	<select id="getGPHistory" parameterType="int" resultType="int">
+		SELECT  COUNT(GP_NUM) AS CNT
+		FROM    GRADUATION_POST
+		WHERE   GP_CHECK = 0
+		AND     STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 졸업유예 신청 등록 -->
+	<insert id="appGP" parameterType="int">
+		INSERT INTO GRADUATION_POST(
+										GP_NUM, STU_NUM, GP_DT, GP_CHECK, GP_COMRE
+		)VALUES(
+					SEQ_GRADUATION_POST.NEXTVAL, #{stuNum}, SYSDATE, 0, NULL)
+	</insert>
+
+</mapper>
+
+
+
+
+
+
+
+
+

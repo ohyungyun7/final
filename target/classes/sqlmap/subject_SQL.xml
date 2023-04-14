@@ -1,0 +1,398 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<!-- namespace : xml파일이 여러개일 수 있으므로 이를 구별하기 위한 용도로 사용 -->
+  <mapper namespace="kr.or.ddit.mapper.SubjectMapper">
+  	<sql id="wh">
+  		<if test="colleage!=null and colleage!=''">
+			AND    (f.COLL_NM   LIKE '%' || #{colleage} || '%')
+		</if>
+	  	<if test="department!=null and department!=''">
+			AND    (e.dept_nm   LIKE '%' || #{department} || '%')
+		</if>
+		<if test="keyword!=null and keyword!=''">
+			AND    (e.dept_nm   LIKE '%' || #{keyword} || '%'
+			OR     a.SBJ_NUM 	LIKE '%' || #{keyword} || '%'
+			OR     a.SBJ_TITLE 	LIKE '%' || #{keyword} || '%'
+			OR     a.SBJ_GRADE 	LIKE '%' || #{keyword} || '%'
+			OR     a.SBJ_RECODE LIKE '%' || #{keyword} || '%'
+			OR     d.tea_nm_kor LIKE '%' || #{keyword} || '%')
+		</if>
+  	</sql>
+
+
+  <resultMap type="subjectVO" id="subjectMap">
+  	<result property="sbjNum" column="SBJ_NUM"/>
+  	<result property="deptNum" column="DEPT_NUM"/>
+  	<result property="teaNum" column="TEA_NUM"/>
+  	<result property="sbjTitle" column="SBJ_TITLE"/>
+  	<result property="sbjGrade" column="SBJ_GRADE"/>
+  	<result property="sbjRecode" column="SBJ_RECODE"/>
+  	<result property="sbjPersonnel" column="SBJ_PERSONNEL"/>
+  	<result property="sbjYn" column="SBJ_YN"/>
+  	<result property="sbjComre" column="SBJ_COMRE"/>
+  	<result property="sbjOc" column="SBJ_OC"/>
+  	<result property="sbjRs" column="SBJ_RS"/>
+  	<result property="currentData" column="CURRENT_DATA"/>
+  	<result property="roomLect" column="ROOM_LECT"/>
+  	<result property="teaNmKor" column="TEA_NM_KOR"/>
+  	<result property="deptNm" column="DEPT_NM"/>
+  	<collection property="timeTcodeList" resultMap="timeMap"></collection>
+  </resultMap>
+  <resultMap type="timeVO" id="timeMap">
+  	<result property="timeTcode" column="TIME_TCODE"/>
+  	<result property="timeDay" column="TIME_DAY"/>
+  	<result property="timeStime" column="TIME_STIME"/>
+  </resultMap>
+
+  <select id="currentRecode" parameterType="int" resultType="int">
+    select  case when sum(b.sbj_recode) is null then  0
+    		else sum(b.sbj_recode)
+            end sbj_recode
+	from shopping_basket a , subject b
+	where
+	a.sbj_num = b.sbj_num
+	and
+	a.stu_num = #{stuNum}
+
+  </select>
+
+
+  <select id="subjectList" parameterType="hashMap" resultMap="subjectMap">
+		SELECT * FROM(
+			with T AS(
+			   	    select a.SBJ_NUM, e.dept_nm, d.tea_nm_kor, a.SBJ_TITLE, a.SBJ_GRADE,
+				       a.SBJ_RECODE, a.SBJ_PERSONNEL, a.SBJ_YN, a.SBJ_COMRE, a.SBJ_OC,
+				       a.SBJ_RS, a.CURRENT_DATA ,b.time_tcode, c.room_lect
+                       , CASE
+                            WHEN B.TIME_TCODE LIKE 'MON%' THEN 1
+                            WHEN B.TIME_TCODE LIKE 'TUE%' THEN 2
+                            WHEN B.TIME_TCODE LIKE 'WEN%' THEN 3
+                            WHEN B.TIME_TCODE LIKE 'THU%' THEN 4
+                            WHEN B.TIME_TCODE LIKE 'FRI%' THEN 5
+                        END AS TIME_ORDER
+					from subject a , lecture_tm b,  room c  ,teacher d , department e , COLLEAGE F
+					where a.sbj_num = b.sbj_num
+					and
+					b.room_code = c.room_code
+			        and
+			        a.tea_num=d.tea_num
+                    and
+                    e.dept_num = a.dept_num
+                    AND
+                    F.COLL_NUM=E.COLL_NUM
+                    AND
+                    A.SBJ_OC != 0
+                    AND
+                    A.SBJ_NUM != 'MAT01009'
+                    AND
+                    A.SBJ_NUM != 'CHE01004'
+                    AND
+                    A.SBJ_NUM != 'MAT01003'
+					 <include refid="wh"/>
+                    ORDER BY A.SBJ_NUM ASC, B.TIME_TCODE ASC
+			)
+			SELECT ROWNUM RNUM,
+			T.SBJ_NUM, T.dept_nm, T.tea_nm_kor, T.SBJ_TITLE, T.SBJ_GRADE,
+			T.SBJ_RECODE, T.SBJ_PERSONNEL, T.SBJ_YN, T.SBJ_COMRE, T.SBJ_OC,
+			T.SBJ_RS, T.CURRENT_DATA ,T.time_tcode, T.TIME_ORDER
+            , T.room_lect
+			FROM T
+			WHERE 1=1
+            ORDER BY T.SBJ_NUM DESC, T.TIME_ORDER ASC , T.time_tcode asc
+		)U
+		WHERE U.RNUM BETWEEN (#{currentPage} * #{show})-(#{show}-1) AND (#{currentPage} * #{show})
+  </select>
+
+  <select id="getTotal" parameterType="hashMap" resultType="int">
+	       WITH T AS(
+	       select a.SBJ_NUM, a.DEPT_NUM, d.tea_nm_kor, a.SBJ_TITLE, a.SBJ_GRADE,
+				       a.SBJ_RECODE, a.SBJ_PERSONNEL, a.SBJ_YN, a.SBJ_COMRE, a.SBJ_OC,
+				       a.SBJ_RS, a.CURRENT_DATA ,b.time_tcode, c.room_lect
+					from subject a , lecture_tm b,  room c  ,teacher d
+					where a.sbj_num = b.sbj_num
+					and
+					b.room_code = c.room_code
+			        and
+			        a.tea_num=d.tea_num
+                    AND
+                    A.SBJ_OC != 0
+                    AND
+                    A.SBJ_NUM != 'MAT01009'
+                    AND
+                    A.SBJ_NUM != 'CHE01004'
+                    AND
+                    A.SBJ_NUM != 'MAT01003'
+					ORDER BY A.SBJ_NUM DESC, B.TIME_TCODE ASC
+	    )
+	    SELECT COUNT(*) TOTAL
+	    FROM   T
+	    WHERE  1 = 1
+	</select>
+
+
+    <update id="incrementCurrent" parameterType="string">
+		update subject set
+		CURRENT_DATA = CURRENT_DATA+1
+		WHERE SBJ_NUM = #{claNum}
+	</update>
+
+	<insert id="insertSubjectList" parameterType="hashMap">
+		insert into SHOPPING_BASKET
+		(SB_NUM, STU_NUM, SBJ_NUM)
+		values
+		(SEQ_SHOPPING_BASKET.nextval, #{userId},#{claNum})
+	</insert>
+
+	<update id="minusCurrent" parameterType="string">
+		update subject set
+		CURRENT_DATA = CURRENT_DATA-1
+		WHERE SBJ_NUM = #{claNum}
+	</update>
+
+	<delete id="deleteSubjectList" parameterType="hashMap">
+		delete from SHOPPING_BASKET
+		where STU_NUM=#{userId} AND SBJ_NUM=#{claNum}
+	</delete>
+
+	<select id="shoppingList" parameterType="int" resultType="shoppingBasketVO">
+		select SB_NUM, STU_NUM, SBJ_NUM
+		from SHOPPING_BASKET
+		where STU_NUM=#{id}
+	</select>
+
+    <select id="mySubjectList" parameterType="hashMap" resultType="subjectVO">
+		SELECT E.TEA_NM_KOR, B.SBJ_TITLE, C.TIME_TCODE , D.ROOM_LECT , F.DEPT_NM, B.SBJ_RS,
+        CASE WHEN C.TIME_TCODE LIKE 'MON%' THEN '1'
+             WHEN C.TIME_TCODE LIKE 'TUE%' THEN '2'
+             WHEN C.TIME_TCODE LIKE 'WEN%' THEN '3'
+             WHEN C.TIME_TCODE LIKE 'THU%' THEN '4'
+             WHEN C.TIME_TCODE LIKE 'FRI%' THEN '5'
+             END TIME_ORDER
+		FROM SHOPPING_BASKET A , SUBJECT B , LECTURE_TM C , ROOM D , TEACHER E , DEPARTMENT F
+		WHERE
+		A.SBJ_NUM = B.SBJ_NUM
+		AND
+		B.SBJ_NUM = C.SBJ_NUM
+		AND
+		C.ROOM_CODE = D.ROOM_CODE
+		AND
+		B.TEA_NUM = E.TEA_NUM
+		AND
+        B.DEPT_NUM = F.DEPT_NUM
+        AND
+		A.STU_NUM=#{userId}
+		order by E.TEA_NM_KOR DESC, b.sbj_title asc , TIME_ORDER ASC , C.TIME_TCODE ASC
+	</select>
+
+	<select id="myListCount" parameterType="hashMap" resultType="int">
+		select count(*)
+		from SHOPPING_BASKET
+		where stu_num=#{userId}
+	</select>
+
+	<select id="getStudentInfo" parameterType="int" resultType="stuVO">
+				SELECT a.STU_NUM, b.DEPT_NM, a.STU_NM_KOR, a.STU_NM_ENG, c.coll_nm,
+                   case when a.STU_SEMESTER='1'  then to_char(extract(year from sysdate)) || '-01'
+                        when a.STU_SEMESTER='2'  then to_char(extract(year from sysdate)) || '-02'
+                        when a.STU_SEMESTER='3'  then to_char(extract(year from sysdate)) || '-01'
+                        when a.STU_SEMESTER='4'  then to_char(extract(year from sysdate)) || '-02'
+                        when a.STU_SEMESTER='5'  then to_char(extract(year from sysdate)) || '-01'
+                        when a.STU_SEMESTER='6'  then to_char(extract(year from sysdate)) || '-02'
+                        when a.STU_SEMESTER='7'  then to_char(extract(year from sysdate)) || '-01'
+                        when a.STU_SEMESTER='8'  then to_char(extract(year from sysdate)) || '-02'
+                        else '초과학기'
+                        end STU_SEMESTER,
+                   case when a.STU_SEMESTER='1'  then '1'
+                        when a.STU_SEMESTER='2'  then '1'
+                        when a.STU_SEMESTER='3'  then '2'
+                        when a.STU_SEMESTER='4'  then '2'
+                        when a.STU_SEMESTER='5'  then '3'
+                        when a.STU_SEMESTER='6'  then '3'
+                        when a.STU_SEMESTER='7'  then '4'
+                        when a.STU_SEMESTER='8'  then '4'
+                        else '초과학기'
+                        end STU_GRADE
+         FROM STUDENT a , department b , colleage c
+		 WHERE
+         a.dept_num = b.dept_num
+         and
+         c.coll_num = b.coll_num
+         and
+         a.STU_NUM =#{id}
+	</select>
+
+	<select id="departmentList" parameterType="string" resultType="departmentVO">
+		select a.DEPT_NUM, a.COLL_NUM, a.DEPT_NM, a.DEPT_NUMBER, a.DEPT_FEES
+		from department a , colleage b
+		where a.coll_num=b.coll_num
+		and
+		b.coll_nm=#{colleage}
+	</select>
+
+	<select id="limitRecode" parameterType="int" resultType="string">
+	SELECT CASE WHEN ROUND(AVG(CL_FSCORE),2) IS NULL THEN 0
+        ELSE ROUND(AVG(CL_FSCORE),2)
+        END CL_FSCORE
+		FROM COURSE_LIST
+		WHERE STU_NUM=#{id}
+		AND
+		CL_SEMESTER = (SELECT MAX(CL_SEMESTER)
+		               FROM COURSE_LIST
+		               WHERE STU_NUM=#{id})
+	</select>
+
+	 <select id="allSubjectList" resultMap="subjectMap">
+
+
+ SELECT T.SBJ_NUM, T.dept_nm, T.tea_nm_kor, T.SBJ_TITLE, T.SBJ_GRADE,
+				       T.SBJ_RECODE, T.SBJ_PERSONNEL, T.SBJ_YN, T.SBJ_COMRE, T.SBJ_OC,
+				       T.SBJ_RS, T.CURRENT_DATA ,T.time_tcode, T.room_lect, T.time_order
+ FROM(
+     select a.SBJ_NUM, e.dept_nm, d.tea_nm_kor, a.SBJ_TITLE, a.SBJ_GRADE,
+				       a.SBJ_RECODE, a.SBJ_PERSONNEL, a.SBJ_YN, a.SBJ_COMRE, a.SBJ_OC,
+				       a.SBJ_RS, a.CURRENT_DATA ,b.time_tcode, c.room_lect,
+                       case when b.time_tcode like 'MON%' then '1'
+                            when b.time_tcode like 'TUE%' then '2'
+                            when b.time_tcode like 'WEN%' then '3'
+                            when b.time_tcode like 'THU%' then '4'
+                            when b.time_tcode like 'FRI%' then '5'
+                            end time_order
+					from subject a , lecture_tm b,  room c  ,teacher d , department e , COLLEAGE F
+					where a.sbj_num = b.sbj_num
+					and
+					b.room_code = c.room_code
+			        and
+			        a.tea_num=d.tea_num
+                    and
+                    e.dept_num = a.dept_num
+                    AND
+                    F.COLL_NUM=E.COLL_NUM
+                    AND
+                    A.SBJ_OC != 0
+                    AND
+                    A.SBJ_NUM != 'MAT01009'
+                    AND
+                    A.SBJ_NUM != 'CHE01004'
+                    AND
+                    A.SBJ_NUM != 'MAT01003'
+                    ORDER BY A.SBJ_NUM DESC
+                    ) T
+                    ORDER BY T.SBJ_NUM DESC, T.time_order asc , T.TIME_TCODE ASC
+  </select>
+
+  <select id="addBasketVO" parameterType="hashMap" resultMap="subjectMap">
+  SELECT T.TEA_NM_KOR, T.SBJ_TITLE, T.TIME_TCODE , T.ROOM_LECT , T.DEPT_NM
+            , T.SBJ_NUM, T.CURRENT_DATA, T.SBJ_PERSONNEL , T.SBJ_GRADE, T.SBJ_RECODE , T.SBJ_RS , T.TIME_ORDER
+
+     FROM(
+        SELECT E.TEA_NM_KOR, B.SBJ_TITLE, C.TIME_TCODE , D.ROOM_LECT , F.DEPT_NM
+			   , B.SBJ_NUM, B.CURRENT_DATA, B.SBJ_PERSONNEL , B.SBJ_GRADE, B.SBJ_RECODE , B.SBJ_RS,
+               CASE WHEN C.TIME_TCODE LIKE 'MON%' THEN 1
+                    WHEN C.TIME_TCODE LIKE 'TUE%' THEN 2
+                    WHEN C.TIME_TCODE LIKE 'WEN%' THEN 3
+                    WHEN C.TIME_TCODE LIKE 'THU%' THEN 4
+                    WHEN C.TIME_TCODE LIKE 'FRI%' THEN 5
+                    END AS TIME_ORDER
+		FROM SHOPPING_BASKET A , SUBJECT B , LECTURE_TM C , ROOM D , TEACHER E , DEPARTMENT F
+        WHERE
+		A.SBJ_NUM = B.SBJ_NUM
+		AND
+		B.SBJ_NUM = C.SBJ_NUM
+		AND
+		C.ROOM_CODE = D.ROOM_CODE
+		AND
+		B.TEA_NUM = E.TEA_NUM
+		AND
+        B.DEPT_NUM = F.DEPT_NUM
+        AND
+		A.STU_NUM=#{userId}
+        AND
+        B.SBJ_NUM=#{claNum}
+		) T
+        ORDER BY T.TEA_NM_KOR DESC, T.sbj_title asc, T.TIME_ORDER ASC, T.TIME_TCODE ASC
+  </select>
+
+	<select id="shoppingRank" resultType="subjectVO">
+		SELECT * FROM(
+		    WITH T AS (
+		        select a.sbj_num, a.sbj_title, count(b.sbj_num) COUNT ,dense_rank() over(ORDER BY COUNT(b.SBJ_NUM) DESC) rank
+		        from subject a, shopping_basket b
+		        where a.sbj_num = b.sbj_num
+		        group by a.sbj_num ,  a.sbj_title
+		        order by rank ASC
+		)
+		SELECT ROWNUM RNUM,
+		T.sbj_title, T.count, T.rank
+		FROM T)U
+		WHERE U.RNUM BETWEEN 1 AND 5
+	</select>
+
+	<select id="examAdd" parameterType="int" resultType="subjectVO">
+		select a.sbj_num , a.sbj_title , c.tea_nm_kor , a.sbj_recode , a.sbj_grade
+		from subject a , subject_plan b , teacher c
+		where a.sbj_num = b.sbj_num
+		and a.tea_num = c.tea_num
+		and a.tea_num = #{teaNum}
+		and b.sp_onlineyn = 1
+		and a.sbj_yn = 1
+	</select>
+
+	<select id="sbjOnlineTitle" parameterType="hashMap" resultType="subjectVO">
+		select b.sbj_title , d.TEA_NM_KOR , e.dept_nm , b.sbj_num
+			from course_list a, subject b , subject_plan c, teacher d, DEPARTMENT e
+			where
+			a.sbj_num = b.sbj_num
+			and
+			a.stu_num = #{stuNum}
+			and
+			b.sbj_num=c.sbj_num
+			and
+			c.sp_onlineyn = 1
+			and
+			b.tea_num = d.tea_num
+			and
+			e.DEPT_NUM = b.DEPT_NUM
+			and
+			b.sbj_num=#{sbjNum}
+			and
+			a.cl_semester = (select max(cl_semester) from course_list WHERE STU_NUM=#{stuNum})
+	</select>
+
+	<update id="updateSemester" parameterType="int">
+	UPDATE STUDENT SET
+						STU_SEMESTER = (SELECT COUNT(DISTINCT(CL_SEMESTER))+1
+						                FROM COURSE_LIST
+						                WHERE STU_NUM = #{id}) WHERE STU_NUM = #{id}
+	</update>
+
+	<insert id="insertCourseList" parameterType="hashMap">
+		INSERT INTO COURSE_LIST
+		(CL_NUM, SBJ_NUM, STU_NUM, CL_SEMESTER, CL_FSCORE)
+		VALUES
+		(SEQ_CL_NUM.NEXTVAL,#{sbjNum},#{stuNum},#{semester},NULL)
+	</insert>
+
+	<delete id="deleteShppingList" parameterType="int">
+		DELETE FROM SHOPPING_BASKET WHERE STU_NUM = #{id}
+	</delete>
+
+	<update id="resetCurrentData">
+		UPDATE SUBJECT SET CURRENT_DATA = 0
+	</update>
+
+	<select id="coursList" parameterType="int" resultType="courseListVO">
+		select CL_NUM, SBJ_NUM, STU_NUM, CL_SEMESTER, CL_FSCORE
+		from course_list
+		where stu_num = #{stuNum}
+	</select>
+
+	<select id="check3dat0" parameterType="hashMap" resultType="courseListVO">
+		SELECT CL_NUM, SBJ_NUM, STU_NUM, CL_SEMESTER, CL_FSCORE
+		FROM COURSE_LIST
+		WHERE SBJ_NUM = #{sbjNum}
+		AND
+		STU_NUM = #{stuNum}
+	</select>
+  </mapper>

@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+  <mapper namespace="kr.or.ddit.mapper.LoginMapper">
+  
+	
+	<select id="checkAuth" parameterType="int" resultType="string">
+         SELECT B.AUTH
+         FROM USERS A LEFT OUTER JOIN AUTHENTICATE B
+         ON(A.USERNAME = B.USERNAME)
+         WHERE A.USERNAME = #{user} 
+	</select>
+	
+	<select id="chcekPW" parameterType="int" resultType="String">
+		SELECT 
+		pkg_crypto.decrypt(PASSWORD) PASSWORD
+		FROM USERS
+		WHERE USERNAME = #{user}
+	</select>
+	
+	<select id="stuLogin" parameterType="stuVO" resultType="stuVO">
+		SELECT C.STU_NUM AS stuNum, C.DEPT_NUM AS deptNum, C.STU_NM_KOR AS stuNmKor, D.AUTH AS auth
+				FROM STUDENT C LEFT OUTER JOIN(    
+				                                SELECT A.USERNAME AS USERNAME, B.AUTH AS AUTH
+				                                FROM USERS A LEFT OUTER JOIN AUTHENTICATE B
+				                                ON(A.USERNAME = B.USERNAME)
+				                                WHERE A.USERNAME = #{stuNum})D
+				ON(C.STU_NUM = D.USERNAME)
+				WHERE C.STU_NUM = #{stuNum}
+	</select>
+	
+	<select id="teaLogin" parameterType="teaVO" resultType="teaVO">
+		SELECT C.TEA_NUM AS teaNum, C.DEPT_NUM AS deptNum, C.TEA_NM_KOR AS teaNmKor, D.AUTH AS auth
+				FROM TEACHER C LEFT OUTER JOIN(    
+				                                SELECT A.USERNAME AS USERNAME, B.AUTH AS AUTH
+				                                FROM USERS A LEFT OUTER JOIN AUTHENTICATE B
+				                                ON(A.USERNAME = B.USERNAME)
+				                                WHERE A.USERNAME = #{teaNum}) D
+				ON(C.TEA_NUM = D.USERNAME)
+				WHERE C.TEA_NUM = #{teaNum}
+	</select>
+	
+	<select id="admLogin" parameterType="admVO" resultType="admVO">
+		SELECT C.EMP_NUM AS empNum, C.EMP_NM_KOR AS empNmKor, D.AUTH AS auth
+				FROM EMPLOYEE C LEFT OUTER JOIN(    
+				                                SELECT A.USERNAME AS USERNAME, B.AUTH AS AUTH
+				                                FROM USERS A LEFT OUTER JOIN AUTHENTICATE B
+				                                ON(A.USERNAME = B.USERNAME)
+				                                WHERE A.USERNAME = #{empNum})D
+				ON(C.EMP_NUM = D.USERNAME)
+				WHERE C.EMP_NUM = #{empNum}	
+	</select>
+	
+	
+	<select id="getStudent" parameterType="int" resultType="userVO">
+		SELECT A.STU_NUM username, A.DEPT_NUM deptNum, A.STU_NM_KOR name, A.STU_PHOTO photo, A.STU_STATUS status,
+		       D.AUTH auth, D.PASSWORD password
+		FROM STUDENT A LEFT OUTER JOIN (       
+							            SELECT B.AUTH AUTH, B.USERNAME USERNAME, pkg_crypto.decrypt(C.PASSWORD) PASSWORD
+							            FROM AUTHENTICATE B LEFT OUTER JOIN USERS C
+							            ON(B.USERNAME = C.USERNAME)
+							            WHERE C.USERNAME = #{username})D
+		ON(A.STU_NUM = D.USERNAME)
+		WHERE A.STU_NUM = #{username}
+	</select>
+
+	<select id="getTeacher" parameterType="int" resultType="userVO">
+		SELECT A.TEA_NUM username, A.DEPT_NUM deptNum, A.TEA_NM_KOR name, A.TEA_PHOTO photo, A.MAJOR major,
+		       D.AUTH auth, D.PASSWORD password
+		FROM TEACHER A LEFT OUTER JOIN (       
+							            SELECT B.AUTH AUTH, B.USERNAME USERNAME, pkg_crypto.decrypt(C.PASSWORD) PASSWORD
+							            FROM AUTHENTICATE B LEFT OUTER JOIN USERS C
+							            ON(B.USERNAME = C.USERNAME)
+							            WHERE C.USERNAME = #{username})D
+		ON(A.TEA_NUM = D.USERNAME)
+		WHERE A.TEA_NUM = #{username}  
+	</select>
+
+	<select id="getAdmin" parameterType="int" resultType="userVO">
+		SELECT A.EMP_NUM username, A.EMP_NM_KOR name, A.EMP_PHOTO photo,
+		       D.AUTH auth, D.PASSWORD password
+		FROM EMPLOYEE A LEFT OUTER JOIN (       
+							            SELECT B.AUTH AUTH, B.USERNAME USERNAME, pkg_crypto.decrypt(C.PASSWORD) PASSWORD
+							            FROM AUTHENTICATE B LEFT OUTER JOIN USERS C
+							            ON(B.USERNAME = C.USERNAME)
+							            WHERE C.USERNAME = #{username})D
+		ON(A.EMP_NUM = D.USERNAME)
+		WHERE A.EMP_NUM = #{username} 
+	</select>
+	
+	<select id="getAuth" parameterType="int" resultType="String">
+		SELECT AUTH FROM AUTHENTICATE
+		WHERE USERNAME = #{user}
+	</select>
+
+	
+  </mapper>

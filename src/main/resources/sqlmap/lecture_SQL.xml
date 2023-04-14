@@ -1,0 +1,220 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.mapper.LectureMapper">
+
+	<!-- (학생) 강의평가 조회 -->
+	<select id="stuLectureList" resultType="lectureEvaVO" parameterType="HashMap">
+		<!-- SELECT A.SBJ_TITLE,  C.TEA_NM_KOR, B.STU_NUM ,  A.SBJ_NUM , (select  COUNT(distinct(SBJ_NUM)) count
+		                                                             from lecture_eva
+		                                                             where stu_num = #{stuNum}
+		                                                             and sbj_num = A.SBJ_NUM) count
+		FROM SUBJECT A, COURSE_LIST B, TEACHER C
+		WHERE A.SBJ_NUM = B.SBJ_NUM
+		AND A.TEA_NUM = C.TEA_NUM
+		AND B.STU_NUM = #{stuNum}
+	    GROUP BY A.SBJ_TITLE,  C.TEA_NM_KOR, B.STU_NUM, A.SBJ_NUM -->
+
+
+	    SELECT A.SBJ_TITLE,  C.TEA_NM_KOR, B.STU_NUM ,  A.SBJ_NUM , (select  COUNT(distinct(SBJ_NUM)) count
+		                                                             from lecture_eva
+		                                                             where stu_num = #{stuNum}
+		                                                             and sbj_num = A.SBJ_NUM) count
+		FROM SUBJECT A, COURSE_LIST B, TEACHER C
+		WHERE A.SBJ_NUM = B.SBJ_NUM
+		AND A.TEA_NUM = C.TEA_NUM
+		AND B.STU_NUM = #{stuNum}
+        AND B.CL_SEMESTER = (SELECT MAX(CL_SEMESTER)
+                               FROM COURSE_LIST
+                              WHERE STU_NUM = #{stuNum})
+	    GROUP BY A.SBJ_TITLE,  C.TEA_NM_KOR, B.STU_NUM, A.SBJ_NUM
+	</select>
+
+	<select id="lectureListList" resultType="lectureEvaVO">
+		select LEL_NUM, LEL_CONTENT
+		from LECTURE_LIST
+		order by LEL_NUM asc
+	</select>
+
+	<select id="studentVO" parameterType="hashMap" resultType="stuVO">
+		SELECT STU_NUM , STU_NM_KOR
+		FROM STUDENT
+		WHERE STU_NUM = #{stuNum}
+	</select>
+
+	<select id="getClNum" parameterType="hashMap" resultType="string">
+	  SELECT CL_NUM
+		FROM COURSE_LIST
+		WHERE SBJ_NUM=#{sbjNum}
+		AND
+		STU_NUM=#{stuNum}
+	</select>
+
+	<select id="getLeNum" parameterType="hashMap" resultType="string">
+		select  NVL(LE_NUM, TO_CHAR(0)) AS LE_NUM
+			from lecture_eva
+			where
+			LEL_NUM = #{lelNum}
+			and
+			cl_num = #{clNum}
+			and
+			sbj_num = #{sbjNum}
+			and
+			stu_num = #{stuNum}
+	</select>
+
+	<!-- <update id="insertLecEva" parameterType="HashMap">
+		MERGE INTO LECTURE_EVA A
+		USING DUAL
+		ON(A.LE_NUM=#{leNum})
+		WHEN MATCHED THEN
+		    UPDATE SET LE_REPLY = #{answer}
+		WHEN NOT MATCHED THEN
+		    INSERT(LE_NUM, LEL_NUM, CL_NUM, SBJ_NUM, STU_NUM, LE_REPLY)
+		    VALUES(TO_CHAR(SEQ_LECTURE_EVALUATION.NEXTVAL), #{lelNum}, #{clNum}, #{sbjNum}, #{stuNum}, #{answer})
+	</update> -->
+
+	<update id="insertLecEva" parameterType="HashMap">
+		MERGE INTO LECTURE_EVA A
+		USING DUAL
+		ON(A.LE_NUM=#{leNum})
+		WHEN MATCHED THEN
+		    UPDATE SET RA_NUM = #{answer}
+		WHEN NOT MATCHED THEN
+		    INSERT(LE_NUM, LEL_NUM, CL_NUM, SBJ_NUM, STU_NUM, RA_NUM)
+		    VALUES(TO_CHAR(SEQ_LECTURE_EVALUATION.NEXTVAL),
+		           #{lelNum},
+		           #{clNum},
+		           #{sbjNum},
+		           #{stuNum},
+		           #{answer})
+	</update>
+
+	<update id="insertLecEva2" parameterType="HashMap">
+		MERGE INTO LECTURE_EVA A
+		USING DUAL
+		ON(A.LE_NUM=#{leNum})
+		WHEN MATCHED THEN
+		    UPDATE SET LE_REPLY = #{answer}
+		WHEN NOT MATCHED THEN
+		    INSERT(LE_NUM, LEL_NUM, CL_NUM, SBJ_NUM, STU_NUM, RA_NUM, LE_REPLY)
+		    VALUES(TO_CHAR(SEQ_LECTURE_EVALUATION.NEXTVAL), #{lelNum}, #{clNum}, #{sbjNum}, #{stuNum}, #{raNum}, #{answer})
+	</update>
+
+	<select id="getTeaVO" resultType="teaVO">
+		SELECT TEA_NUM, DEPT_NUM, TEA_NM_KOR, TEA_NM_ENG, TEA_PN,
+	       TEA_REG1, TEA_REG2, TEA_EMAIL, TEA_PHOTO, TEA_ZIP,
+	       TEA_ADDR1, TEA_ADDR2, MAJOR, TEA_LNUM, TEA_LNM,
+	       TEA_NATION, TEA_TITLE, TEA_BANK, TEA_ACCOUNT, TEA_HDC
+		FROM TEACHER
+		WHERE TEA_NUM = #{teaNum}
+	</select>
+
+	<select id="myLectureCheckList" parameterType="hashMap" resultType="subjectVO">
+		SELECT  A.SBJ_NUM,A.SBJ_TITLE,  C.TEA_NM_KOR, A.SBJ_GRADE, A.SBJ_RECODE, A.SBJ_RS  , (SELECT COUNT(DISTINCT(STU_NUM))
+											                                                    FROM LECTURE_EVA
+											                                                    WHERE SBJ_NUM = A.SBJ_NUM
+											                                                    GROUP BY A.SBJ_NUM) count
+			FROM SUBJECT A, COURSE_LIST B, TEACHER C ,LECTURE_EVA D
+			WHERE A.SBJ_NUM = B.SBJ_NUM
+			AND A.TEA_NUM = C.TEA_NUM
+	        AND A.TEA_NUM = #{teaNum}
+	        AND A.SBJ_OC != 0
+	        AND A.SBJ_NUM != 'MAT01009'
+            AND A.SBJ_NUM != 'CHE01004'
+            AND A.SBJ_NUM != 'MAT01003'
+		    GROUP BY A.SBJ_TITLE,  C.TEA_NM_KOR,  A.SBJ_NUM, A.SBJ_GRADE, A.SBJ_RECODE, A.SBJ_RS
+	</select>
+
+
+<!-- 	<resultMap type="lectureListVO" id="lectureList">
+		<result property="lelNum" column="LEL_NUM"/>
+		<result property="lelContent" column="LEL_CONTENT"/>
+		<result property="count" column="COUNT"/>
+		<collection property="replyAnswerList" resultMap="replyAnswer"/>
+	</resultMap>
+	<resultMap type="replyAnswerVO" id="replyAnswer">
+		<result property="raNum" column="RA_NUM"/>
+		<result property="raAnswer" column="RA_ANSWER"/>
+		<result property="count" column="COUNT"/>
+	</resultMap> -->
+
+
+	<resultMap type="lectureEvaVO" id="lectureEva">
+		<result property="lelNum" column="LEL_NUM"/>
+		<result property="lelContent" column="LEL_CONTENT"/>
+		<result property="leNum" column="LE_NUM"/>
+		<result property="clNum" column="CL_NUM"/>
+		<result property="sbjNum" column="SBJ_NUM"/>
+		<result property="stuNum" column="STU_NUM"/>
+		<result property="leRePLY" column="LE_REPLY"/>
+		<result property="raAnswer" column="RA_ANSWER"/>
+		<result property="sbjTitle" column="SBJ_TITLE"/>
+		<result property="teaNmKor" column="TEA_NM_KOR"/>
+		<result property="count" column="COUNT"/>
+		<collection property="replyAnswerList" resultMap="replyAnswer"/>
+	</resultMap>
+	<resultMap type="replyAnswerVO" id="replyAnswer">
+		<result property="raNum" column="RA_NUM"/>
+		<result property="raAnswer" column="RA_ANSWER"/>
+		<result property="count" column="COUNT"/>
+	</resultMap>
+
+
+<!-- 	<select id="getRatioLecture" parameterType="hashMap" resultMap="lectureEva"> -->
+	<select id="getRatioLecture" parameterType="hashMap" resultType="lectureEvaVO">
+     SELECT  RA_NUM ,LEL_NUM , LEL_CONTENT , RA_ANSWER , COUNT
+			FROM (
+			        SELECT C.RA_NUM, A.LEL_NUM, A.LEL_CONTENT , C.RA_ANSWER ,(SELECT COUNT(RA_NUM)
+			                                                    FROM LECTURE_EVA
+			                                                    WHERE SBJ_NUM = #{sbjNum}
+			                                                    AND LE_REPLY IS NULL
+			                                                    AND RA_NUM = C.RA_NUM
+			                                                    AND LEL_NUM = A.LEL_NUM) AS COUNT
+			        FROM LECTURE_LIST A, LECTURE_EVA B , REPLY_ANSWER C
+			        WHERE B.SBJ_NUM = #{sbjNum}
+			        AND
+			        C.RA_ANSWER IS NOT NULL
+			        AND
+                    A.LEL_NUM !=6
+			) MST
+			GROUP BY MST.LEL_NUM, MST.LEL_CONTENT , MST.RA_ANSWER , MST.COUNT , MST.RA_NUM
+			ORDER BY MST.LEL_NUM, MST.RA_NUM ASC
+	</select>
+
+	<select id="replyAnswer" parameterType="hashMap" resultType="lectureEvaVO">
+	 		 select LE_REPLY
+	           from LECTURE_EVA
+	           where
+	           SBJ_NUM = #{sbjNum}
+	           and
+	           LE_REPLY is not null
+	</select>
+
+    <select id="myLectureList" parameterType="hashMap" resultType="courseListVO">
+	    SELECT  DISTINCT(CL_SEMESTER)
+		FROM COURSE_LIST
+		WHERE STU_NUM = #{stuNum}
+		ORDER BY CL_SEMESTER ASC
+    </select>
+
+    <sql id="where">
+    	<if test="year!=null and year!=''">
+    		AND B.CL_SEMESTER LIKE '%' || #{year} || '-' || #{semester} || '%'
+    	</if>
+    </sql>
+
+    <select id="stuLectureList2" parameterType="hashMap" resultType="lectureEvaVO">
+    	SELECT A.SBJ_TITLE,  C.TEA_NM_KOR, B.STU_NUM ,  A.SBJ_NUM , (select  COUNT(distinct(SBJ_NUM)) count
+		                                                             from lecture_eva
+		                                                             where stu_num = #{stuNum}
+		                                                             and sbj_num = A.SBJ_NUM) count
+		FROM SUBJECT A, COURSE_LIST B, TEACHER C
+		WHERE A.SBJ_NUM = B.SBJ_NUM
+		AND A.TEA_NUM = C.TEA_NUM
+		AND B.STU_NUM = #{stuNum}
+		<include refid="where"/>
+	    GROUP BY A.SBJ_TITLE,  C.TEA_NM_KOR, B.STU_NUM, A.SBJ_NUM
+    </select>
+
+</mapper>

@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace : xml파일이 여러개일 수 있으므로
+	이를 구별하기 위한 식별 용도로 사용
+ -->
+<mapper namespace="kr.or.ddit.mapper.ACADCalendarMapper">
+
+	<select id="acadDataList" resultType="acVO">
+		SELECT DATE_NUM AS "id", SUBSTR(DATE_START,1,10) AS "start", SUBSTR(DATE_END,1,10) AS "end", DATE_NM AS "title",
+				EMP_NUM AS "username2", DATE_CATE AS "calendar"
+		FROM ACAD_DT
+	</select>
+	
+<!-- 	<select id="calDataList" resultType="fcVO"> -->
+<!-- 		SELECT TITLE, START1 AS "START", END1 AS "END", ALLDAY, CALENDAR, ID  -->
+<!-- 		FROM FC -->
+<!-- 	</select> -->
+	
+	<insert id="addEvent" parameterType="acVO">
+		<selectKey resultType="int" order="BEFORE" keyProperty="id">
+			SELECT NVL(MAX(DATE_NUM),0) + 1
+            FROM ACAD_DT
+		</selectKey>
+		INSERT INTO ACAD_DT(DATE_NUM, DATE_START, DATE_END, DATE_NM, EMP_NUM, DATE_CATE)
+		VALUES(#{id}, #{start}, #{end}, #{title}, #{username1}, #{calendar})
+	</insert>
+	
+	<update id="updateEvent" parameterType="acVO">
+	 	UPDATE ACAD_DT SET
+	 		 DATE_START = #{start}, DATE_END = #{end}, DATE_NM = #{title}, DATE_CATE = #{calendar}
+	 	WHERE DATE_NUM = #{id}	 
+	</update>
+	
+	<delete id="removeEvent" parameterType="acVO">
+		DELETE FROM ACAD_DT
+		WHERE DATE_NUM = #{id}
+	</delete>
+	
+	<select id="getEventText" parameterType="int" resultType="acVO">
+		SELECT SUBSTR(DATE_START,1,10) AS "start",SUBSTR(DATE_END,1,10) AS end, DATE_NM AS title, DATE_CATE AS calendar
+		FROM ACAD_DT
+		WHERE SUBSTR(DATE_START,6,2) = #{data}
+        ORDER BY DATE_START
+	</select>
+
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

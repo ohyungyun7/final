@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.RoomMapper">
+	
+	<select id="getList" resultType="roomvo">
+		SELECT R.ROOM_CODE, R.BUILDING_CODE, B.BUILDING_NAME, R.ROOM_FLR, R.ROOM_CAPACITY, R.ROOM_LECT, R.ROOM_PHOTO
+		FROM ROOM R, BUILDING B
+		WHERE B.BUILDING_CODE = R.BUILDING_CODE
+		ORDER BY 1
+	</select>
+	
+	<select id="getBldgList" resultType="buildingvo">
+		SELECT BUILDING_CODE, BUILDING_NAME
+		FROM BUILDING
+		ORDER BY 1
+	</select>
+
+
+</mapper>

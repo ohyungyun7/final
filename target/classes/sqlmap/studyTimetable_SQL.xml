@@ -1,0 +1,178 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="kr.or.ddit.mapper.StudyTimetableMapper">
+
+	<select id="getStuList" parameterType="int" resultType="stuVO">
+        SELECT A.STU_NUM, A.STU_PHOTO, STU_NM_KOR
+        FROM STUDENT A, (
+                         SELECT STU_NUM, S_NUM
+                         FROM STUDY
+                         WHERE S_GRADE = 0 OR S_GRADE = 1) B
+       WHERE B.S_NUM = #{data} AND A.STU_NUM = B.STU_NUM
+
+<!-- 		SELECT A.STU_NUM, A.STU_PHOTO, A.STU_NM_KOR -->
+<!-- 		FROM STUDENT A, STUDY B -->
+<!-- 		WHERE B.S_NUM = #{data} AND A.STU_NUM = B.STU_NUM AND B.S_GRADE = 0 AND B.S_GRADE = 1 -->
+	</select>
+
+	<select id="getTimeTableData" parameterType="int" resultType="timeVO">
+		SELECT A.TIME_TCODE
+		FROM LECTURE_TM A, (
+		                    SELECT SBJ_NUM AS SBJ_NUM
+		                    FROM COURSE_LIST
+		                    WHERE STU_NUM = #{data} AND CL_SEMESTER = '2023-01') B
+		WHERE A.SBJ_NUM = B.SBJ_NUM
+	</select>
+
+	<select id="stuTimetable" parameterType="int" resultType="timeVO">
+        SELECT C.TIME_TCODE, D.SBJ_TITLE
+        FROM (
+                SELECT A.TIME_TCODE, B.SBJ_NUM
+                FROM LECTURE_TM A, (
+                                    SELECT SBJ_NUM AS SBJ_NUM
+                                    FROM COURSE_LIST
+                                    WHERE STU_NUM = #{data} AND CL_SEMESTER = '2023-01') B
+                WHERE A.SBJ_NUM = B.SBJ_NUM) C, SUBJECT D
+       WHERE C.SBJ_NUM = D.SBJ_NUM
+	</select>
+
+	<select id="teaTimetable" parameterType="int" resultType="timeVO">
+     SELECT C.TIME_TCODE, D.SBJ_TITLE , COUNT(C.TIME_TCODE)
+        FROM (
+                SELECT A.TIME_TCODE, B.SBJ_NUM
+                FROM LECTURE_TM A, (
+                                    SELECT SBJ_NUM 
+                                    FROM COURSE_LIST
+                                    WHERE CL_SEMESTER = '2023-01') B
+                WHERE A.SBJ_NUM = B.SBJ_NUM) C, SUBJECT D
+               
+       WHERE C.SBJ_NUM = D.SBJ_NUM AND D.TEA_NUM = #{data}
+        GROUP BY (C.TIME_TCODE, D.SBJ_TITLE)
+       ORDER BY D.SBJ_TITLE DESC
+	</select>
+
+	<select id="getVoteNum" resultType="int">
+		SELECT (NVL(MAX(VOTE_NUM),0))+1 FROM VOTE
+	</select>
+
+	<insert id="addVote" parameterType="votevo">
+		INSERT INTO VOTE(VOTE_NUM, VOTE_TITLE, VOTE_ENDDT, VOTE_ADMIN, S_NUM, PERIOD)
+			VALUES(#{voteNum}, #{voteTitle}, #{voteEnddt}, #{voteAdmin}, #{sNum}, #{period})
+	</insert>
+
+ 	 <update id="addVoters" parameterType="java.util.List">
+ 	 	<selectKey resultType="int" order="BEFORE" keyProperty="votersNum">
+ 	 		SELECT NVL(MAX(VOTERS_NUM),0) + 1 FROM VOTERS
+ 	 	</selectKey>
+ 	 	<foreach collection="list" item="votersvo"
+ 	 			 open="insert all" close="select * from dual" separator=" " index="idx">
+ 	 		INTO VOTERS(VOTERS_NUM, VOTE_NUM, VOTERS_STU)
+ 	 		VALUES(#{idx}+#{votersNum}, #{votersvo.voteNum}, #{votersvo.votersStu})
+	 	</foreach>
+ 	 </update>
+
+ 	<resultMap type="votevo" id="voteMap">
+ 		<result property="voteNum" column="VOTE_NUM" />
+ 		<result property="sNum" column="S_NUM" />
+ 		<result property="voteTitle" column="VOTE_TITLE" />
+ 		<result property="voteEnddt" column="VOTE_ENDDT" />
+ 		<result property="voteAdmin" column="VOTE_ADMIN" />
+ 		<result property="period" column="PERIOD" />
+ 		<collection property="votersList" resultMap="votersMap"></collection>
+ 	</resultMap>
+
+ 	<resultMap type="votersvo" id="votersMap">
+ 		<result property="votersNum" column="VOTERS_NUM" />
+ 		<result property="voteNum" column="VOTE_NUM" />
+ 		<result property="votersStu" column="VOTERS_STU" />
+ 		<result property="voteAns" column="VOTE_ANS" />
+ 		<result property="votersName" column="STU_NM_KOR" />
+ 		<result property="votersPhoto" column="STU_PHOTO" />
+ 	</resultMap>
+
+  	<select id="getVoteList" parameterType="int" resultMap="voteMap">
+		SELECT A.VOTE_NUM, A.VOTE_TITLE, TO_CHAR(A.VOTE_ENDDT,'YYYY-MM-DD') AS VOTE_ENDDT, A.VOTE_ADMIN, A.S_NUM, A.PERIOD, U.*
+		FROM VOTE A,(SELECT B.VOTERS_NUM, B.VOTE_NUM, B.VOTERS_STU, B.VOTE_ANS,
+		                                C.STU_NM_KOR, C.STU_PHOTO
+		                        FROM VOTERS B, STUDENT C
+		                        WHERE B.VOTERS_STU = C.STU_NUM)U
+		WHERE A.S_NUM = #{data} AND A.VOTE_NUM = U.VOTE_NUM
+		ORDER BY A.VOTE_ENDDT DESC
+  	</select>
+
+  	<select id="checkVoters" parameterType="votersvo" resultType="int">
+  		SELECT COUNT(*)
+  		FROM VOTERS
+  		WHERE VOTE_NUM = #{voteNum} AND VOTERS_STU = #{votersStu}
+  	</select>
+
+	<select id="voteDetail" parameterType="votevo" resultType="votevo">
+<!-- 		SELECT VOTE_NUM, VOTE_TITLE, VOTE_ENDDT, VOTE_ADMIN, S_NUM, PERIOD -->
+<!-- 		FROM VOTE -->
+<!-- 		WHERE VOTE_NUM = #{voteNum} -->
+		SELECT VOTE_NUM, VOTE_TITLE, TO_CHAR(VOTE_ENDDT,'YYYY-MM-DD') AS voteDate, VOTE_ADMIN, S_NUM, PERIOD
+		FROM VOTE
+		WHERE VOTE_NUM = #{voteNum}
+	</select>
+
+	<select id="voteRate" parameterType="votevo" resultType="votevo">
+		SELECT NVL((100 - A.RATE), 0) AS yes, NVL(A.RATE, 0) AS no, NVL(B.RATE, 0) AS participation, C.VOTE_ANS,  D.VOTE_ADMIN
+		FROM (SELECT ROUND(AVG(VOTE_ANS -1) * 100) AS RATE
+		        FROM (SELECT *
+		                FROM VOTERS
+		                WHERE VOTE_NUM = #{voteNum} AND VOTE_ANS IN (1,2)
+		              )
+		      ) A,
+		      (SELECT ROUND(AVG(VOTE) * 100) AS RATE
+		         FROM (SELECT CASE WHEN VOTE_ANS = 0 THEN 0 ELSE 1 END AS VOTE FROM VOTERS WHERE VOTE_NUM = #{voteNum})
+              ) B,
+              (SELECT VOTE_ANS
+               FROM VOTERS
+               WHERE VOTERS_STU = #{votersStu} AND VOTE_NUM = #{voteNum}) C,
+              (SELECT VOTE_ADMIN
+               FROM VOTE
+               WHERE VOTE_NUM = #{voteNum}) D
+	</select>
+
+	<delete id="delVoters" parameterType="int">
+		DELETE FROM VOTERS WHERE VOTE_NUM = #{data}
+	</delete>
+
+	<delete id="delVote" parameterType="int">
+		DELETE FROM VOTE WHERE VOTE_NUM = #{data}
+	</delete>
+
+	<update id="voteUpdate" parameterType="votersvo">
+		UPDATE VOTERS
+		SET
+		VOTE_ANS = #{voteAns}
+		WHERE VOTE_NUM = #{voteNum} AND VOTERS_STU = #{votersStu}
+	</update>
+
+	<select id="studyList" parameterType="int" resultType="String">
+		SELECT S.*
+		FROM (SELECT S_NM AS TITLE
+		        FROM STUDY
+		        WHERE STU_NUM = #{data}
+		        ORDER BY S_DT DESC) S
+		WHERE ROWNUM BETWEEN 1 AND 4
+	</select>
+
+</mapper>
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

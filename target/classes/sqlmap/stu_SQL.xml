@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+ <mapper namespace="kr.or.ddit.mapper.StuMapper">
+ 	
+ 	<sql id="and">
+		<!-- 조건 검색 -->
+		<if test="selectKey!=null and selectKey!=''">
+			AND (STU_STATUS = #{selectKey})
+		</if>
+	</sql>
+ 	
+ 	<select id="stuList" parameterType="int" resultType="studentVO">
+ 		SELECT 
+		    A.STU_NUM, A.DEPT_NUM, A.STU_NM_KOR, A.STU_NM_ENG, A.STU_REG1, A.STU_REG2, A.STU_EMAIL, A.STU_PN, 
+		    NVL(A.STU_PHOTO,'사진없음') STU_PHOTO,
+		    A.STU_MS, A.STU_HDC, A.STU_NATION, A.STU_ZIP, A.STU_ADDR1, A.STU_ADDR2, 
+		    NVL(A.STU_MINOR,'-') STU_MINOR, 
+		    NVL(STU_DMAJOR,'-') STU_DMAJOR, 
+		    A.STU_BANK, A.STU_ACCOUNT, A.STU_STATUS, A.STU_SEMESTER,
+		    B.DEPT_NM
+		FROM STUDENT A, DEPARTMENT B
+		WHERE A.DEPT_NUM = B.DEPT_NUM
+		<include refid="and"></include>
+		ORDER BY A.STU_STATUS, A.STU_NUM
+ 	</select>
+ 	
+ 	<update id="insertMany" parameterType="java.util.List" > 
+		<foreach collection="list" item="studentVO" separator=" " open="INSERT ALL" close="SELECT * FROM DUAL"> 
+			INTO STUDENT(
+				STU_NUM, DEPT_NUM, STU_NM_KOR, STU_NM_ENG, 
+				STU_REG1, STU_REG2, STU_EMAIL, STU_PN, 
+				STU_MS, STU_HDC, STU_NATION, 
+<!-- 				STU_PHOTO,  -->
+<!-- 				STU_ZIP, STU_ADDR1, STU_ADDR2,  -->
+				STU_BANK, STU_ACCOUNT
+			) VALUES(
+				#{studentVO.stuNum}, #{studentVO.deptNum}, #{studentVO.stuNmKor}, #{studentVO.stuNmEng} 
+				, #{studentVO.stuReg1}, #{studentVO.stuReg2}, #{studentVO.stuEmail}, #{studentVO.stuPn}
+				, #{studentVO.stuMs}, #{studentVO.stuHdc}, #{studentVO.stuNation}
+<!-- 				, #{studentVO.stuPhoto} -->
+<!-- 				, #{studentVO.stuZip}, #{studentVO.stuAddr1}, #{studentVO.stuAddr2} -->
+				, #{studentVO.stuBank}, #{studentVO.stuAccount}
+			) 
+		</foreach> 
+	</update>
+	
+	<update id="insertManyUsers" parameterType="java.util.List">
+		<foreach collection="list" item="studentVO" open="INSERT ALL" close="SELECT * FROM DUAL" separator=" ">
+			INTO USERS(USERNAME,PASSWORD,ENABLED) VALUES (#{studentVO.stuNum}, pkg_crypto.ENCRYPT(#{studentVO.stuReg1}),1)
+		</foreach>
+	</update>
+	
+	<update id="insertManyAuth" parameterType="java.util.List">
+		<foreach collection="list" item="studentVO" open="INSERT ALL" close="SELECT * FROM DUAL" separator=" ">
+			INTO AUTHENTICATE(AUTH, USERNAME) VALUES ('ROLE_STU', #{studentVO.stuNum})
+		</foreach>
+	</update>
+	
+	<insert id="insertStu" parameterType="studentVO">
+		INSERT INTO STUDENT(
+			STU_NUM, DEPT_NUM, STU_NM_KOR, STU_NM_ENG, 
+			STU_REG1, STU_REG2, STU_EMAIL, STU_PN, 
+			STU_MS, STU_HDC, STU_NATION, 
+			STU_ZIP, STU_ADDR1, STU_ADDR2, 
+			STU_BANK, STU_ACCOUNT
+		) VALUES(
+			#{stuNum}, #{deptNum}, #{stuNmKor}, #{stuNmEng}
+			,#{stuReg1}, #{stuReg2}, #{stuEmail}, #{stuPn}
+			,#{stuMs}, #{stuHdc}, #{stuNation}
+			,#{stuZip}, #{stuAddr1}, #{stuAddr2}
+			,#{stuBank}, #{stuAccount}
+		) 
+	</insert>
+	
+	<select id="getDeptList" resultType="departmentVO">
+		SELECT DEPT_NUM, DEPT_NM FROM DEPARTMENT
+	</select>
+	
+	<select id="totalStu" resultType="int">
+		SELECT COUNT(*) 
+		FROM STUDENT
+		WHERE STU_STATUS = 0 OR STU_STATUS = 1 OR STU_STATUS = 5
+	</select>
+	<select id="newStu" resultType="int">
+		SELECT COUNT(*) 
+		FROM STUDENT
+		WHERE stu_num like '2023%'
+	</select>
+	<select id="originStu" resultType="int">
+		SELECT COUNT(*) 
+		FROM STUDENT
+		WHERE STU_STATUS = 0 OR STU_STATUS = 5
+	</select>
+	<select id="gradStu" resultType="int">
+		SELECT COUNT(*) 
+		FROM STUDENT
+		WHERE STU_STATUS = 3
+	</select>
+ 
+ </mapper>

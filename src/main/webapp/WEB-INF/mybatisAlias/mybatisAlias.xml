@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+  PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+	<settings>
+		<setting name="mapUnderscoreToCamelCase" value="true"/>
+	</settings>
+	<typeAliases>
+
+	<typeAlias type="kr.or.ddit.vo.StudentVO" alias="stuVO" />
+	<typeAlias type="kr.or.ddit.vo.TeacherVO" alias="teaVO" />
+	<typeAlias type="kr.or.ddit.vo.AdminVO" alias="admVO" />
+	<typeAlias type="kr.or.ddit.vo.UserVO" alias="userVO" />
+	<typeAlias type="kr.or.ddit.vo.DepartmentNoticeVO" alias="dnVO" />
+	<typeAlias type="kr.or.ddit.vo.DepartmentFileVO" alias="dfVO" />
+	<typeAlias type="kr.or.ddit.vo.NoticeBoardVO" alias="nbVO" />
+	<typeAlias type="kr.or.ddit.vo.NoticeBoardFileVO" alias="nfVO" />
+	<typeAlias type="kr.or.ddit.vo.ACADCalendarVO" alias="acVO" />
+	<typeAlias type="kr.or.ddit.vo.StudyScheduleVO" alias="ssVO" />
+
+	<typeAlias type="kr.or.ddit.vo.CourseVO" alias="courseVO" />
+	<typeAlias type="kr.or.ddit.vo.ScholarshipVO" alias="scholarshipVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseDetailVO" alias="courseDetailVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseNoticeVO" alias="courseNoticeVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseReferenceVO" alias="courseReferenceVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseAssignmentVO" alias="courseAssignmentVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseAttendanceVO" alias="courseAttendanceVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseAtListVO" alias="courseAtListVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseListVO" alias="courseListVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseAtVO" alias="courseAtVO" />
+
+	<typeAlias type="kr.or.ddit.vo.SubmitVO" alias="submitVO" />
+	<typeAlias type="kr.or.ddit.vo.TuitionVO" alias="tuitionVO" />
+	<typeAlias type="kr.or.ddit.vo.SmsVO" alias="smsVO" />
+
+	<typeAlias type="kr.or.ddit.vo.BuildingVO" alias="buildingVO" />
+	<typeAlias type="kr.or.ddit.vo.RoomVO" alias="roomVO" />
+	<typeAlias type="kr.or.ddit.vo.TimeVO" alias="timeVO" />
+	<typeAlias type="kr.or.ddit.vo.RoomScheduleVO" alias="roomScheduleVO" />
+	<typeAlias type="kr.or.ddit.vo.SubjectVO" alias="subjectVO" />
+	<typeAlias type="kr.or.ddit.vo.SubjectPlanVO" alias="subjectPlanVO" />
+	<typeAlias type="kr.or.ddit.vo.SubjectIndexVO" alias="subjectIndexVO" />
+	<typeAlias type="kr.or.ddit.vo.ShoppingBasketVO" alias="shoppingBasketVO" />
+	<typeAlias type="kr.or.ddit.vo.DepartmentVO" alias="departmentVO" />
+
+	<typeAlias type="kr.or.ddit.vo.ExamVO" alias="examVO" />
+	<typeAlias type="kr.or.ddit.vo.ExamQue" alias="examQueVO" />
+	<typeAlias type="kr.or.ddit.vo.ExamSel" alias="examSelVO" />
+
+	<typeAlias type="kr.or.ddit.vo.LectureTmVO" alias="lectureTmVO" />
+	<typeAlias type="kr.or.ddit.vo.LectureEvaVO" alias="lectureEvaVO" />
+	<typeAlias type="kr.or.ddit.vo.CourseListVO" alias="courseListVO" />
+
+	<typeAlias type="kr.or.ddit.vo.StudyVO" alias="studyVO" />
+	<typeAlias type="kr.or.ddit.vo.AnswerVO" alias="answerVO" />
+	<typeAlias type="kr.or.ddit.vo.LectureListVO" alias="lectureListVO" />
+	<typeAlias type="kr.or.ddit.vo.ReplyAnswerVO" alias="replyAnswerVO" />
+
+	<typeAlias type="kr.or.ddit.vo.AcademicVO" alias="academicVO" />
+	<typeAlias type="kr.or.ddit.vo.AcaColleageVO" alias="acaColleageVO" />
+	<typeAlias type="kr.or.ddit.vo.AcaDeptVO" alias="acaDeptVO" />
+	<typeAlias type="kr.or.ddit.vo.ReportCardVO" alias="reportCardVO" />
+	<typeAlias type="kr.or.ddit.vo.GradeObjectVO" alias="gradeObjectVO" />
+	<typeAlias type="kr.or.ddit.vo.ColleageVO" alias="colleageVO" />
+
+
+	<package name="kr.or.ddit.vo"/>
+
+	</typeAliases>
+</configuration>
+
+
+
+
+
+
+

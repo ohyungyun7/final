@@ -1,0 +1,35 @@
+﻿SVN 주소
+
+1팀 : 프로젝트 소스 : http://112.220.114.130:10001/svn/projects/202209M/team1/source
+      산출물 저장소 : http://112.220.114.130:10001/svn/projects/202209M/team1/documents
+
+2팀 : 프로젝트 소스 : http://112.220.114.130:10001/svn/projects/202209M/team2/source
+      산출물 저장소 : http://112.220.114.130:10001/svn/projects/202209M/team2/documents
+
+3팀 : 프로젝트 소스 : http://112.220.114.130:10001/svn/projects/202209M/team3/source
+      산출물 저장소 : http://112.220.114.130:10001/svn/projects/202209M/team3/documents
+
+4팀 : 프로젝트 소스 : http://112.220.114.130:10001/svn/projects/202209M/team4/source
+      산출물 저장소 : http://112.220.114.130:10001/svn/projects/202209M/team4/documents
+
+
+SVN_ID : 202209_본인이름이니셜 (대문자)
+         (password는 모두 java)
+
+
+
+레드마인 주소 : http://112.220.114.130:83/redmine/
+
+
+DB주소   : 112.220.114.130
+Port번호 : 1521
+SID      : xe
+
+
+DB_ID  (passsword는 모두 java) 
+1팀 : team1_202209m 
+2팀 : team2_202209m 
+3팀 : team3_202209m 
+4팀 : team4_202209m 
+
+

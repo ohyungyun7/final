@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="kr.or.ddit.mapper.EmployeeMapper">
+
+	<sql id="where">
+		<!--   	EMP_NM_KOR 이름 EMP_NUM 사번  EMP_DP부서  EMP_GROUP소속 -->
+		<if test="category=='empnnum' and keyword!=null and keyword!=''">
+			AND   (EMP_NUM   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="category=='empnmkor' and keyword!=null and keyword!=''">
+			AND   (EMP_NM_KOR   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="category=='empdp' and keyword!=null and keyword!=''">
+			AND   (EMP_DP   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="category=='empgroup' and keyword!=null and keyword!=''">
+			AND   (EMP_GROUP   LIKE '%' || #{keyword} || '%')
+		</if>
+		<if test="keyword!=null and keyword!=''">
+			AND(
+				   EMP_NM_KOR LIKE '%' || #{keyword} || '%'
+				OR EMP_NUM LIKE '%' || #{keyword} || '%'
+				OR EMP_DP LIKE '%' || #{keyword} || '%'
+				OR EMP_GROUP LIKE '%' || #{keyword} || '%'
+			)
+		</if>
+  	</sql>
+
+
+ <select id="getTotal" parameterType="hashMap" resultType="int">
+ 	 	 WITH T AS(
+		      SELECT ROW_NUMBER() OVER(ORDER BY EMP_NUM DESC) RNUM,
+		               EMP_NUM, EMP_NM_KOR, EMP_DP, EMP_GROUP, EMP_TITLE
+		      FROM EMPLOYEE   
+		      WHERE 1=1)
+ 	 	SELECT COUNT(*) FROM EMPLOYEE
+ 	 	WHERE 1=1
+ 	 	<include refid="where" />
+ 	 </select>
+
+	<!-- (관리자) 리스트 조회 -->
+	<select id="admList" resultType="admVO" parameterType="HashMap">
+		   WITH T AS(
+		      SELECT ROW_NUMBER() OVER(ORDER BY EMP_NUM DESC) RNUM,
+		               EMP_NUM, EMP_NM_KOR, EMP_DP, EMP_GROUP, EMP_TITLE
+		      FROM EMPLOYEE   
+		      WHERE 1=1
+     	    <include refid="where" />
+		       )
+		        SELECT T.EMP_NUM, T.EMP_NM_KOR, T.EMP_DP, T.EMP_GROUP, T.EMP_TITLE
+		        FROM T 
+         WHERE T.RNUM BETWEEN (#{currentPage} * #{size}) - (#{size} - 1) and (#{currentPage} * #{size})
+	</select>
+	
+	
+	<!-- (관리자) 1명 상세조회 -->
+	<select id="empNum" resultType="admVO" parameterType="HashMap">
+		SELECT EMP_NUM, EMP_NM_KOR, EMP_NM_ENG, EMP_GROUP, EMP_TITLE, EMP_PN, EMP_REG1, EMP_REG2,
+		       EMP_ACCOUNT,EMP_ZIP, EMP_ADDR1, EMP_ADDR2, EMP_EMAIL, EMP_BANK, EMP_PHOTO FROM EMPLOYEE
+		       WHERE EMP_NUM = #{empNum}
+	</select>
+	
+	<!-- (관리자) 삭제  -->
+ 	<delete id="deleteNum" parameterType="HashMap">
+ 		DELETE EMPLOYEE WHERE EMP_NUM = #{empNum}
+ 	</delete>
+ 	 
+ 		<!-- (관리자) 아이디삭제  -->
+	<delete id="deleteUsers" parameterType="HashMap">
+		DELETE FROM USERS WHERE USERNAME = (SELECT USERNAME FROM USERS WHERE USERNAME = #{empNum})
+ 	</delete>
+ 	
+
+ 		<!-- (관리자) 권한삭제  -->
+ 	<delete id="deleteAuth" parameterType="HashMap">
+		DELETE FROM AUTHENTICATE WHERE USERNAME = (SELECT USERNAME FROM AUTHENTICATE WHERE USERNAME = #{empNum}) 
+ 	</delete>
+ 	 
+ 	 
+ 	<!-- (관리자) 모달창 수정 -->
+ 	<update id="updatePost" parameterType="HashMap">
+ 		UPDATE EMPLOYEE SET 
+			EMP_NM_KOR = #{empNmKor}, EMP_NM_ENG = #{empNmEng}, 
+			EMP_PN = #{empPn}, EMP_EMAIL = #{empEmail},
+			EMP_ADDR1 = #{empAddr1}, EMP_ADDR2 = #{empAddr2},
+			EMP_BANK = #{empBank}, EMP_ACCOUNT = #{empAccount}, EMP_ZIP = #{empZip}
+		 WHERE EMP_NUM = #{empNum}
+ 	</update>
+ 	
+ 	<!--(관리자) 사번 자동생성 -->
+	<select id="getEmpNum" resultType="int">
+		SELECT NVL(MAX(EMP_NUM),0)+1 FROM EMPLOYEE
+	</select> 	
+ 	
+ 	<!-- (관리자) 교직원 등록 -->
+ 	<insert id="createPost" parameterType="HashMap">
+ 		<selectKey order="BEFORE" keyProperty="empNum1" resultType="int">
+			SELECT NVL(MAX(EMP_NUM),0)+1 FROM EMPLOYEE
+ 		</selectKey>
+	 		INSERT INTO EMPLOYEE
+			(EMP_NUM, EMP_NM_KOR, EMP_NM_ENG, EMP_PN,
+			 EMP_EMAIL, EMP_REG1, EMP_REG2, EMP_ZIP,
+			 EMP_ADDR1, EMP_ADDR2, EMP_GROUP, EMP_DP
+			 )
+			VALUES(#{empNum1},#{empNmKor1},#{empNmEng1},#{empPn1}
+			,#{empEmail1},#{empReg3},#{empReg4},#{empZip1},#{empAddr3}
+			,#{empAddr4},#{empGroup1},#{empDp1} )
+ 	</insert>
+ 	
+ 	<!-- (관리자) 교직원 권한 등록 -->
+ 	<insert id="createAuth" parameterType="int">
+		INSERT INTO AUTHENTICATE
+		(USERNAME, AUTH)
+		VALUES
+		((SELECT NVL(MAX(EMP_NUM),0)+1 FROM EMPLOYEE) , 'ROLE_ADMIN')
+ 	</insert>
+ 	
+ 	<!-- (관리자) 교직원 아이디등록 -->
+ 	<insert id="createUsers" parameterType="int">
+	 	INSERT INTO USERS
+	 	(USERNAME, PASSWORD, ENABLED)
+		VALUES
+		((SELECT NVL(MAX(EMP_NUM),0)+1 FROM EMPLOYEE) ,PKG_CRYPTO.ENCRYPT('JAVA'), 1)
+ 	</insert>
+ 	
+
+ 
+</mapper>
+

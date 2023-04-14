@@ -1,0 +1,991 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<!-- namespace : xml파일이 여러개일 수 있으므로
+	이를 구별하기 위한 식별 용도로 사용
+ -->
+<mapper namespace="kr.or.ddit.mapper.AcademicMapper">
+	<!-- 학생 학적정보 출력 -->
+	<select id="getStuInfo" parameterType="int" resultType="hashMap">
+		SELECT C.STU_NUM, C.STU_NM_KOR, C.STU_STATUS, C.STU_PHOTO, D.DEPT_NUM, D.DEPT_NM, C.STU_SEMESTER, NVL(C.STU_DMAJOR,0) AS STU_DMAJOR
+		     , NVL(STU_MINOR,0) AS STU_MINOR
+		     , (
+		        SELECT NVL(SUM(A.SBJ_RECODE),0) AS SUM_MAJOR
+		        FROM SUBJECT A
+		        LEFT OUTER JOIN COURSE_LIST B
+		        ON(B.SBJ_NUM = A.SBJ_NUM)
+		        WHERE DEPT_NUM IS NOT NULL
+		        AND B.STU_NUM = #{stuNum}
+		        AND B.CL_FSCORE > 0
+		        )AS MAJOR_RECODE
+		     , (
+		         SELECT NVL(SUM(A.SBJ_RECODE),0) AS SUM_ELECTIVE
+		        FROM SUBJECT A
+		        LEFT OUTER JOIN COURSE_LIST B
+		        ON(B.SBJ_NUM = A.SBJ_NUM)
+		        WHERE DEPT_NUM = 0
+		        AND B.STU_NUM = #{stuNum}
+		        AND B.CL_FSCORE > 0
+		        ) AS ELECTIVE_RECODE
+		    , (
+		        SELECT NVL(B.DEPT_NM, '') AS DMAJOR_NM
+		        FROM STUDENT A
+		        LEFT OUTER JOIN DEPARTMENT B
+		        ON(B.DEPT_NUM = A.STU_DMAJOR)
+		        WHERE A.STU_NUM = #{stuNum})AS DMAJOR_NM
+		  , (
+		  		SELECT NVL(B.DEPT_NM, '') AS MINOR_NM
+		        FROM STUDENT A
+		        LEFT OUTER JOIN DEPARTMENT B
+		        ON(B.DEPT_NUM = A.STU_MINOR)
+		        WHERE A.STU_NUM = #{stuNum})AS MINOR_NM
+		FROM STUDENT C
+		INNER JOIN DEPARTMENT D
+		ON(D.DEPT_NUM = C.DEPT_NUM)
+		WHERE STU_NUM = #{stuNum}
+	</select>
+
+	<!-- (학생)각 학적변동 신청 건수 조회(처리상태:대기) -->
+	<select id="getAcCnt" parameterType="hashMap" resultType="int">
+		SELECT COUNT(*) AS CNT
+		FROM ACADEMIC_CHG
+		WHERE STU_NUM = #{stuNum}
+		AND AC_LIST = #{acList}
+		AND AC_CHECK = 0
+	</select>
+
+	<!-- (학생)학적상태 조회 -->
+	<select id="getStuStatus" parameterType="int" resultType="int">
+		SELECT NVL(STU_STATUS, 0) AS STU_STATUS
+		FROM STUDENT
+		WHERE STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 휴학 신청 -->
+	<insert id="appLeave" parameterType="academicVO">
+		INSERT INTO ACADEMIC_CHG(
+		                          AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+		                        , AC_EDT, AC_CHECK, AC_COMRE)
+		VALUES(
+				SEQ_ACADEMIC_CHANGE.NEXTVAL, #{stuNum}, #{acReason}, 1, #{acSdt}
+		     , #{acEdt}, 0, NULL)
+	</insert>
+
+	<!-- (학생)휴학생 휴학 신청내역 조회 -->
+	<select id="getLeaveHistory" parameterType="int" resultType="academicVO">
+		SELECT	AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+		      , AC_EDT, AC_CHECK, NVL(AC_COMRE, ' ') AS AC_COMRE
+		FROM ACADEMIC_CHG
+		WHERE STU_NUM = #{stuNum}
+		AND AC_LIST = 1
+		AND SUBSTR(AC_EDT,1,4) >= TO_CHAR(SYSDATE,'YYYY')
+		ORDER BY AC_EDT DESC
+	</select>
+
+	<!-- (학생)복학 신청 -->
+	<insert id="appReturn" parameterType="hashMap">
+		INSERT INTO ACADEMIC_CHG(
+								    AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+								  , AC_EDT, AC_CHECK, AC_COMRE
+								)
+		VALUES(
+				SEQ_ACADEMIC_CHANGE.NEXTVAL, #{stuNum}, NULL, 0, #{acSdt}
+			  , NULL, 0, NULL)
+	</insert>
+
+	<!-- 복수전공/부전공 신청 내역 조회 -->
+	<select id="getDMHistory" parameterType="hashMap" resultType="int">
+		SELECT	COUNT(DM_NUM) AS CNT
+		FROM	DOUBLE_MAJOR
+		WHERE	STU_NUM = #{stuNum}
+		AND		DM_DIVISION = #{dmDivision}
+		AND		NVL(DM_CHECK,0) = #{dmCheck}
+	</select>
+
+	<!-- (학생)자퇴 신청 -->
+	<insert id="appDropout" parameterType="hashMap">
+		INSERT INTO ACADEMIC_CHG(
+								  AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+								, AC_EDT, AC_CHECK, AC_COMRE
+		)VALUES(
+				 SEQ_ACADEMIC_CHANGE.NEXTVAL, #{stuNum}, #{acReason}, 2, #{acSdt}
+			   , NULL, 0, NULL)
+	</insert>
+
+	<resultMap type="acaColleageVO" id="acaColleageMap">
+		<result property="collNum" column="COLL_NUM" />
+		<result property="collNm" column="COLL_NM" />
+		<collection property="acaDeptList" resultMap="acaDeptMap"></collection>
+	</resultMap>
+
+	<resultMap type="acaDeptVO" id="acaDeptMap">
+		<result property="deptNum" column="DEPT_NUM" />
+		<result property="collNum" column="COLL_NUM" />
+		<result property="deptNm" column="DEPT_NM" />
+		<result property="deptNumber" column="DEPT_NUMBER" />
+		<result property="deptFees" column="DEPT_FEES" />
+	</resultMap>
+
+	<!-- (학생)복수전공/부전공 신청 - 단과대학 명 & 단과대학별 소속학과 출력 -->
+	<select id="getCollNDeptList" resultMap="acaColleageMap">
+		SELECT	DISTINCT A.COLL_NUM, A.COLL_NM, B.DEPT_NUM, B.COLL_NUM, B.DEPT_NM, B.DEPT_NUMBER, B.DEPT_FEES
+		FROM	COLLEAGE A
+		LEFT OUTER JOIN DEPARTMENT B
+		ON(B.COLL_NUM = A.COLL_NUM)
+		WHERE	A.COLL_NUM > 0
+		ORDER BY A.COLL_NM ASC, B.DEPT_NM
+	</select>
+
+	<!-- (학생)복수전공/부전공 신청 - 단과대 내 학과 목록 출력 -->
+	<select id="getDeptList" parameterType="String" resultType="AcaDeptVO">
+		SELECT	DISTINCT B.DEPT_NUM, B.COLL_NUM, B.DEPT_NM, B.DEPT_NUMBER, B.DEPT_FEES
+		FROM	COLLEAGE A
+		LEFT OUTER JOIN DEPARTMENT B
+		ON(B.COLL_NUM = A.COLL_NUM)
+		WHERE	A.COLL_NUM > 0
+		AND		A.COLL_NM = #{collNm}
+		ORDER BY B.DEPT_NM
+	</select>
+
+	<!-- 단과대학&학과명 동시 출력
+	String collNum
+	 -->
+	<select id="getCnDList" parameterType="String" resultType="hashMap">
+		SELECT	DISTINCT A.COLL_NUM, A.COLL_NM, B.DEPT_NUM, B.COLL_NUM, B.DEPT_NM, B.DEPT_NUMBER, B.DEPT_FEES
+		FROM	COLLEAGE A
+		LEFT OUTER JOIN DEPARTMENT B
+		ON(B.COLL_NUM = A.COLL_NUM)
+		WHERE	A.COLL_NUM > 0
+		AND		A.COLL_NUM = #{collNum}
+		ORDER BY A.COLL_NM ASC, B.DEPT_NM
+	</select>
+
+
+	<!-- (학생)복수전공/부전공 신청 -->
+	<insert id="appDM" parameterType="hashMap">
+		INSERT INTO DOUBLE_MAJOR(
+								  DM_NUM, DEPT_NO, STU_NUM, DM_DIVISION, DM_CHECK
+							    , DM_COMRE, DM_CDT
+		)VALUES(
+				  SEQ_DOUBLE_MAJOR.NEXTVAL, #{deptNo}, #{stuNum}, #{dmDivision}, 0
+				, NULL, NULL)
+	</insert>
+
+	<!-- (학생)복수전공/부전공 신청 요건 조회(이수학기, 평균평점, 전공과목 이수학점 -->
+	<select id="getStuQual" parameterType="int" resultType="hashMap">
+		SELECT	A.STU_NUM, A.STU_SEMESTER
+		      , SUM(B.CL_FSCORE) AS SUM_FSCORE
+		      , COUNT(B.CL_NUM) AS CNT
+		      , ROUND(SUM(B.CL_FSCORE)/COUNT(B.CL_NUM),2) AS AR
+		      , (
+		            SELECT SUM(B.SBJ_RECODE)
+		            FROM COURSE_LIST A
+		            INNER JOIN SUBJECT B
+		            ON(B.SBJ_NUM = A.SBJ_NUM)
+		            WHERE A.STU_NUM = #{stuNum}
+		            AND B.DEPT_NUM IS NOT NULL
+		        )AS SUM_MAJOR
+		FROM	STUDENT A
+		LEFT OUTER JOIN COURSE_LIST B
+		ON(B.STU_NUM = A.STU_NUM)
+		WHERE	B.CL_NUM IS NOT NULL
+		AND		A.STU_NUM = #{stuNum}
+		GROUP BY A.STU_NUM, A.STU_SEMESTER
+	</select>
+
+	<!-- 전과 -->
+	<!-- (전과 신청 조건)학과번호, 재학/휴학 인원 조회 -->
+	<select id="getTRCon" parameterType="int" resultType="hashMap">
+		SELECT	DEPT_NUM
+		      , (
+		          	SELECT COUNT(STU_NUM) AS CNT_AL
+		            FROM STUDENT
+		            WHERE DEPT_NUM = #{deptNum}
+		            AND (STU_STATUS = 0
+		                 OR STU_STATUS = 1)
+		          )AS CNT_AL
+		       , (
+		            SELECT DEPT_NUMBER
+		            FROM DEPARTMENT
+		            WHERE DEPT_NUM = #{deptNum}
+		         )AS DEPT_NUMBER
+		FROM	DEPARTMENT
+		WHERE	DEPT_NUM = #{deptNum}
+	</select>
+
+	<!-- 추가 등록금 조회(기존학과 등록금 - 전과학과 등록금) -->
+	<select id="getAddFee" parameterType="hashMap" resultType="hashMap">
+		SELECT (
+	            (
+	                SELECT A.DEPT_FEES
+	                FROM DEPARTMENT A
+	                WHERE A.DEPT_NUM = #{preDeptNum}
+	            )
+	         - (
+	                SELECT B.DEPT_FEES
+	                FROM DEPARTMENT B
+	                WHERE B.DEPT_NUM = #{tranDeptNum}
+	            )
+	        ) AS ADDFEE
+		FROM DUAL
+	</select>
+
+	<!-- 전과신청 내역 조회 -->
+	<select id="getTRHistory" parameterType="hashMap" resultType="int">
+		SELECT	COUNT(NVL(TD_NUM, 0)) AS CNT_TR
+		FROM	TRANSFER_DP
+		WHERE	STU_NUM = #{stuNum}
+		AND		TD_CHECK = #{tdCheck}
+	</select>
+
+	<!-- 전과 신청 -->
+	<insert id="appTR" parameterType="hashMap">
+		INSERT INTO TRANSFER_DP(
+		                          TD_NUM, DEPT_NUM, STU_NUM, TD_DT, TD_CHECK
+		                        , TD_COMRE, TD_OLD
+		)VALUES(
+		          SEQ_TRANSFER_DEPARTMENT.NEXTVAL, #{tranDeptNum}, #{stuNum}, SYSDATE, DEFAULT
+		        , NULL, #{preDeptNum})
+	</insert>
+
+	<!-- (학생)학적변동 신청 목록 조회 -->
+	<select id="getAcChgList" parameterType="int" resultType="hashMap">
+		SELECT  ROW_NUMBER() OVER(ORDER BY AC_NUM DESC) AS ROW_NUM
+		     , (SELECT	COUNT(AC_NUM)
+		         FROM	ACADEMIC_CHG
+		         WHERE	STU_NUM = #{stuNum}
+		         AND    AC_LIST != 3
+		        )AS CNT
+		      , AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+		      , AC_EDT, AC_CHECK, AC_COMRE
+		FROM    ACADEMIC_CHG
+		WHERE   STU_NUM = #{stuNum}
+		AND		AC_LIST != 3
+	</select>
+
+	<!-- (학생)복수전공/부전공 신청 목록 조회 -->
+	<select id="getDMList" parameterType="int" resultType="hashMap">
+		SELECT  ROW_NUMBER() OVER(ORDER BY A.DM_NUM DESC) ROW_NUM
+		      , (SELECT COUNT(DM_NUM)
+		         FROM DOUBLE_MAJOR
+		         WHERE   STU_NUM = #{stuNum}
+		        )AS CNT
+		      , A.DM_NUM, A.DEPT_NO, A.STU_NUM, A.DM_DIVISION
+		      , A.DM_CHECK, A.DM_COMRE, A.DM_CDT, B.DEPT_NM
+		FROM DOUBLE_MAJOR A
+		LEFT OUTER JOIN DEPARTMENT B
+		ON(B.DEPT_NUM = A.DEPT_NO)
+		WHERE A.STU_NUM = #{stuNum}
+		AND B.DEPT_NUM = A.DEPT_NO
+	</select>
+
+	<!-- (학생)전과 신청 목록 조회 -->
+	<select id="getTranList" parameterType="int" resultType="hashMap">
+		SELECT  ROW_NUMBER() OVER(ORDER BY TD_NUM DESC) ROW_NUM
+		      , (SELECT COUNT(TD_NUM)
+		         FROM TRANSFER_DP
+		         WHERE   STU_NUM = #{stuNum}
+		        )AS CNT
+		      , TD_NUM, DEPT_NUM, STU_NUM, TD_DT
+		      , TD_CHECK, TD_COMRE, TD_OLD
+		      , (
+		            SELECT DEPT_NM
+		            FROM DEPARTMENT A
+		            INNER JOIN (SELECT  ROW_NUMBER() OVER(ORDER BY TD_NUM DESC) ROW_NUM
+		                              , TD_NUM, DEPT_NUM, STU_NUM, TD_DT
+		                              , TD_CHECK, TD_COMRE, TD_OLD
+		                        FROM TRANSFER_DP
+		                        WHERE STU_NUM = #{stuNum})B
+		            ON(B.TD_OLD = A.DEPT_NUM)
+		            WHERE A.DEPT_NUM = B.TD_OLD
+		        )AS TD_OLD_NM
+		      , (
+		            SELECT B.DEPT_NM
+		            FROM TRANSFER_DP A
+		            LEFT OUTER JOIN DEPARTMENT B
+		            ON(B.DEPT_NUM = A.DEPT_NUM)
+		            WHERE A.DEPT_NUM = B.DEPT_NUM
+		            AND STU_NUM = #{stuNum}
+		        )AS DEPT_NM
+		FROM TRANSFER_DP
+		WHERE STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 전과 신청목록 조회2 -->
+	<select id="getTranList2" parameterType="int" resultType="hashMap">
+		SELECT  ( SELECT COUNT(TD_NUM)
+		          FROM TRANSFER_DP
+		          WHERE STU_NUM = #{stuNum} )AS CNT
+		        , A.TD_NUM, A.DEPT_NUM, A.STU_NUM, A.TD_DT, A.TD_CHECK
+		        , A.TD_COMRE, A.TD_OLD
+		        , B.DEPT_NM
+		        , C.DEPT_NM AS OLD_DEPT_NM
+		FROM    TRANSFER_DP A
+		LEFT OUTER JOIN DEPARTMENT B
+		ON(B.DEPT_NUM = A.DEPT_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = A.TD_OLD)
+		WHERE   STU_NUM = #{stuNum}
+	</select>
+
+	<!-- 학적변동 반려사유 조회 -->
+	<select id="getChgRejectReason" parameterType="int" resultType="hashMap">
+		SELECT  AC_NUM, STU_NUM, AC_REASON, AC_LIST, AC_SDT
+		      , AC_EDT, AC_CHECK, AC_COMRE
+		FROM    ACADEMIC_CHG
+		WHERE   AC_NUM = #{acNum}
+	</select>
+
+	<!-- 복수전공/부전공 반려사유 조회 -->
+	<select id="getDMRejectReason" parameterType="int" resultType="hashMap">
+		SELECT  DM_NUM, DEPT_NO, STU_NUM, DM_DIVISION, DM_CHECK
+		      , DM_COMRE, DM_CDT
+		FROM    DOUBLE_MAJOR
+		WHERE   DM_NUM = #{dmNum}
+	</select>
+
+	<!-- 전과 반려사유 조회 -->
+	<select id="getTRRejectReason" parameterType="int" resultType="hashMap">
+		SELECT  TD_NUM, DEPT_NUM, STU_NUM, TD_DT, TD_CHECK, NVL(TD_COMRE,'nodata') TD_COMRE, TD_OLD
+		FROM    TRANSFER_DP
+		WHERE   TD_NUM = #{tdNum}
+	</select>
+
+	<!-- (관리자) 승인대기 상태인 학적변동 + 졸업유예 신청내역 조회 -->
+	<select id="getAcGpList2" resultType="hashMap">
+		SELECT  AC_NUM AS NUM
+		      , REPLACE(A.AC_CHECK, '0', '대기')AS CHG_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM
+		      , B.STU_NM_KOR
+		      , REPLACE(REPLACE(REPLACE(REPLACE(A.AC_LIST, '0', '복학')
+		      											 , '1', '휴학')
+		      											 , '2', '자퇴')
+		      											 , '3', '조기졸업') AS CONT
+		      , NVL(A.AC_REASON, ' ') AS REASON
+		FROM    ACADEMIC_CHG A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		WHERE   A.AC_CHECK = 0
+
+		UNION ALL
+
+		SELECT  GP_NUM AS NUM
+		      , REPLACE(A.GP_CHECK, '0', '대기')AS CHG_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM
+		      , B.STU_NM_KOR
+		      , '졸업유예' AS CONT
+		      , ' ' AS REASON
+		FROM    GRADUATION_POST A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		WHERE   GP_CHECK = 0
+		ORDER BY NUM ASC
+	</select>
+
+	<!-- (관리자) (승인대기,승인,반려 전체 조회) 학적변동 + 졸업유예 신청내역 조회 -->
+	<select id="getAcGpList" resultType="hashMap">
+		SELECT  AC_NUM AS NUM
+		      , REPLACE(REPLACE(REPLACE(A.AC_CHECK, '0', '대기')
+		                                          , '1', '승인')
+		                                          , '2', '반려') AS CHG_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM
+		      , B.STU_NM_KOR
+		      , REPLACE(REPLACE(REPLACE(REPLACE(A.AC_LIST, '0', '복학')
+		                                                 , '1', '휴학')
+		                                                 , '2', '자퇴')
+		                                                 , '3', '조기졸업') AS CONT
+		      , NVL(A.AC_REASON, ' ') AS REASON
+		FROM    ACADEMIC_CHG A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+
+		UNION ALL
+
+		SELECT  GP_NUM AS NUM
+		      , REPLACE(REPLACE(REPLACE(A.GP_CHECK, '0', '대기')
+		                                          , '1', '승인')
+		                                          , '2', '반려')AS CHG_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM
+		      , B.STU_NM_KOR
+		      , '졸업유예' AS CONT
+		      , ' ' AS REASON
+		FROM    GRADUATION_POST A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		ORDER BY CHG_CHECK ASC, NUM ASC
+	</select>
+
+	<!-- 학적변동 + 졸업유예 신청 건수 조회 -->
+	<select id="getAcGpCnt2" resultType="int">
+		SELECT  ((SELECT  COUNT(*) AS CNT
+		          FROM    ACADEMIC_CHG
+		          WHERE   AC_CHECK = 0)
+		        +
+		         (SELECT  COUNT(*) AS CNT
+		          FROM    GRADUATION_POST
+		          WHERE   GP_CHECK = 0))AS CNT
+		FROM DUAL
+	</select>
+
+	<!-- 학적변동 + 졸업유예 신청 건수 조회(*최종 수정) -->
+	<select id="getAcGpCnt" resultType="int">
+		SELECT  ((SELECT  COUNT(*) AS CNT
+		          FROM    ACADEMIC_CHG)
+		        +
+		         (SELECT  COUNT(*) AS CNT
+		          FROM    GRADUATION_POST))AS CNT
+		FROM DUAL
+	</select>
+
+	<!-- 학적변동 + 졸업유예 개별 신청 건 조회 -->
+	<select id="getSingleAppHistory" parameterType="hashMap" resultType="hashMap">
+		SELECT  NUM, CHG_CHECK, STU_NUM, DEPT_NM, STU_NM_KOR
+		      , CONT, REASON
+		FROM(
+		        SELECT  AC_NUM AS NUM
+		              , REPLACE(A.AC_CHECK, '0', '대기')AS CHG_CHECK
+		              , A.STU_NUM
+		              , C.DEPT_NM
+		              , B.STU_NM_KOR
+		              , REPLACE(REPLACE(REPLACE(REPLACE(A.AC_LIST, '0', '복학'), '1', '휴학'), '2', '자퇴'), '3', '조기졸업') AS CONT
+		              , NVL(A.AC_REASON, ' ') AS REASON
+		        FROM    ACADEMIC_CHG A
+		        LEFT OUTER JOIN STUDENT B
+		        ON(B.STU_NUM = A.STU_NUM)
+		        LEFT OUTER JOIN DEPARTMENT C
+		        ON(C.DEPT_NUM = B.DEPT_NUM)
+		        WHERE   A.AC_CHECK = 0
+
+		        UNION ALL
+
+		        SELECT  GP_NUM AS NUM
+		              , REPLACE(A.GP_CHECK, '0', '대기')AS CHG_CHECK
+		              , A.STU_NUM
+		              , C.DEPT_NM
+		              , B.STU_NM_KOR
+		              , '졸업유예' AS CONT
+		              , ' ' AS REASON
+		        FROM    GRADUATION_POST A
+		        LEFT OUTER JOIN STUDENT B
+		        ON(B.STU_NUM = A.STU_NUM)
+		        LEFT OUTER JOIN DEPARTMENT C
+		        ON(C.DEPT_NUM = B.DEPT_NUM)
+		        WHERE   GP_CHECK = 0
+		        ORDER BY NUM ASC
+		)
+		WHERE   NUM = #{num}
+		AND		CONT = #{cont}
+	</select>
+
+
+	<!-- (관리자) 학적변동 승인처리에 따른 학생 학적상태 변경 -->
+	<update id="updateStuStatus" parameterType="hashMap">
+		UPDATE  STUDENT
+		SET     STU_STATUS = #{stuStatus}
+		WHERE   STU_NUM = #{stuNum}
+	</update>
+
+	<!-- (관리자) 학적변동 승인처리 -->
+	<update id="processAcChg" parameterType="int">
+		UPDATE  ACADEMIC_CHG
+		SET     AC_CHECK = 1
+		WHERE   AC_NUM = #{acNum}
+	</update>
+
+	<!-- (관리자) 졸업유예 승인처리 -->
+	<update id="processGp" parameterType="int">
+		UPDATE  GRADUATION_POST
+		SET     GP_CHECK = 1
+		WHERE   GP_NUM = #{gpNum}
+	</update>
+
+	<!-- (관리자) 졸업유예 반려처리 -->
+	<update id="rejectGp" parameterType="hashMap">
+		UPDATE  GRADUATION_POST
+		SET     GP_CHECK = 2
+		      , GP_COMRE = #{gpComre}
+		WHERE   GP_NUM = #{gpNum}
+	</update>
+
+	<!-- (관리자) 학적변동 반려처리 -->
+	<update id="rejectAcChg" parameterType="hashMap">
+		UPDATE  ACADEMIC_CHG
+		SET     AC_CHECK = 2
+		      , AC_COMRE = #{acComre}
+		WHERE   AC_NUM = #{acNum}
+	</update>
+
+	<!-- (관리자) 복수전공/부전공 신청 처리 -->
+	<!-- (관리자) 복수전공/부전공 신청내역 조회 -->
+	<select id="getDMListAdm2" resultType="hashMap">
+		SELECT  A.DM_NUM
+		      , REPLACE(A.DM_CHECK, '0', '대기')AS DM_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM AS MAJOR_DEPT_NM
+		      , B.STU_NM_KOR
+		      , REPLACE(REPLACE(A.DM_DIVISION, '0', '복수전공'), '1', '부전공') AS DM_DIVISION
+		      , A.DM_COMRE
+		      , D.DEPT_NM AS APP_DEPT_NM
+		      , D.DEPT_NUM AS APP_DEPT_NUM
+		FROM    DOUBLE_MAJOR A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		LEFT OUTER JOIN DEPARTMENT D
+		ON(D.DEPT_NUM = A.DEPT_NO)
+		WHERE   A.DM_CHECK = 0
+		ORDER BY A.DM_NUM ASC
+	</select>
+
+	<!-- (관리자) (승인대기,승인,반려 전체 조회)복수전공/부전공 신청내역 조회 -->
+	<select id="getDMListAdm" resultType="hashMap">
+		SELECT  A.DM_NUM
+		      , REPLACE(REPLACE(REPLACE(A.DM_CHECK, '0', '대기')
+		                                          , '1', '승인')
+		                                          , '2', '반려')AS DM_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM AS MAJOR_DEPT_NM
+		      , B.STU_NM_KOR
+		      , REPLACE(REPLACE(A.DM_DIVISION, '0', '복수전공')
+		                                     , '1', '부전공') AS DM_DIVISION
+		      , A.DM_COMRE
+		      , D.DEPT_NM AS APP_DEPT_NM
+		      , D.DEPT_NUM AS APP_DEPT_NUM
+		FROM    DOUBLE_MAJOR A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		LEFT OUTER JOIN DEPARTMENT D
+		ON(D.DEPT_NUM = A.DEPT_NO)
+		ORDER BY DM_CHECK ASC, DM_NUM ASC
+	</select>
+
+	<!-- (관리자) 복수전공/부전공 신청 건수 조회 -->
+	<select id="getDMCnt" resultType="int">
+		SELECT  COUNT(*) AS CNT
+		FROM    DOUBLE_MAJOR
+	</select>
+
+	<!-- (관리자) 복수전공 신청 승인처리 -->
+	<update id="approveDM" parameterType="int">
+		UPDATE  DOUBLE_MAJOR
+		SET     DM_CHECK = 1
+			  , DM_CDT = SYSDATE
+		WHERE   DM_NUM = #{dmNum}
+	</update>
+
+	<!-- (관리자) 복수전공 신청 승인처리에 따른 학생정보 수정 -->
+	<update id="updateStuInfo" parameterType="hashMap">
+		UPDATE  STUDENT
+		SET     STU_DMAJOR = #{stuDmajor}
+		WHERE   STU_NUM = #{stuNum}
+	</update>
+
+	<!-- (관리자) 복수전공 개별 신청 건 조회  -->
+	<select id="getSingleDMHistory" parameterType="int" resultType="hashMap">
+		SELECT  A.STU_NUM
+		      , B.STU_NM_KOR
+		      , REPLACE(REPLACE(A.DM_DIVISION, '0', '복수전공'), '1', '부전공') AS DM_DIVISION
+		      , ' 'AS REASON
+		FROM    DOUBLE_MAJOR A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		WHERE   A.DM_NUM = #{dmNum}
+	</select>
+
+	<!-- (관리자) 복수전공 반려처리 -->
+	<update id="rejectDM" parameterType="hashMap">
+		UPDATE  DOUBLE_MAJOR
+		SET     DM_CHECK = 2
+		      , DM_COMRE = #{dmComre}
+		      , DM_CDT = SYSDATE
+		WHERE   DM_NUM = #{dmNum}
+	</update>
+
+
+	<!-- (관리자) 전과 신청 처리 -->
+	<!-- (관리자) 전과 신청내역 조회 -->
+	<select id="getTRListAdm" resultType="hashMap">
+		SELECT  A.TD_NUM
+		      , REPLACE(REPLACE(REPLACE(A.TD_CHECK, '0', '대기')
+		                                          , '1', '승인')
+		                                          , '2', '반려')AS TD_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM AS MAJOR_DEPT_NM
+		      , B.STU_NM_KOR
+		      , D.DEPT_NM AS APP_DEPT_NM
+		      , D.DEPT_NUM AS APP_DEPT_NUM
+		FROM    TRANSFER_DP A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		LEFT OUTER JOIN DEPARTMENT D
+		ON(D.DEPT_NUM = A.DEPT_NUM)
+		ORDER BY TD_CHECK ASC, TD_NUM ASC
+	</select>
+
+	<select id="getTRListAdm_origin" resultType="hashMap">
+		SELECT  A.TD_NUM
+		      , REPLACE(A.TD_CHECK, '0', '대기') AS TD_CHECK
+		      , A.STU_NUM
+		      , C.DEPT_NM AS MAJOR_DEPT_NM
+		      , B.STU_NM_KOR
+		      , D.DEPT_NM AS APP_DEPT_NM
+		      , D.DEPT_NUM AS APP_DEPT_NUM
+		FROM    TRANSFER_DP A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		LEFT OUTER JOIN DEPARTMENT D
+		ON(D.DEPT_NUM = A.DEPT_NUM)
+		WHERE   TD_CHECK = 0
+	</select>
+
+	<!-- (관리자) 전과 신청 건수 조회 -->
+	<select id="getTDCnt" resultType="int">
+		SELECT  COUNT(*) AS CNT
+		FROM    TRANSFER_DP
+	</select>
+
+	<!-- (관리자) 전과 신청 승인처리 -->
+	<update id="approveTD" parameterType="int">
+		UPDATE  TRANSFER_DP
+		SET     TD_CHECK = 1
+		WHERE   TD_NUM = #{tdNum}
+	</update>
+
+	<!-- (관리자) 전과 신청 승인처리에 따른 학생정보 수정 -->
+	<update id="updateStuInfoByTD" parameterType="hashMap">
+		UPDATE  STUDENT
+		SET     DEPT_NUM = #{deptNum}
+		WHERE   STU_NUM = #{stuNum}
+	</update>
+
+	<!-- (관리자) 전과 개별 신청 건 조회 -->
+	<select id="getSingleTDHistory" parameterType="int" resultType="hashMap">
+		SELECT  A.STU_NUM
+		      , B.STU_NM_KOR
+		      , '전과'AS CONT
+		      , ' 'AS REASON
+		FROM    TRANSFER_DP A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		WHERE   TD_NUM = #{tdNum}
+	</select>
+
+	<!-- (관리자) 전과 신청 반려처리 -->
+	<update id="rejectTD" parameterType="hashMap">
+		UPDATE  TRANSFER_DP
+		SET     TD_CHECK = 2
+		      , TD_COMRE = #{tdComre}
+		WHERE   TD_NUM = #{tdNum}
+	</update>
+
+
+	<!-- (관리자) 검색 -->
+	<!-- 학적변동 + 졸업유예 신청목록 출력(학생명으로 검색한 결과) -->
+	<select id="getAcGpListIncSearch" parameterType="hashMap" resultType="hashMap">
+
+			SELECT U.*
+			FROM(
+			        SELECT  AC_NUM AS NUM
+			              , REPLACE(REPLACE(REPLACE(A.AC_CHECK, '0', '대기')
+		                                          , '1', '승인')
+		                                          , '2', '반려') AS CHG_CHECK
+			              , A.STU_NUM
+			              , C.DEPT_NM
+			              , B.STU_NM_KOR
+			              , REPLACE(REPLACE(REPLACE(REPLACE(A.AC_LIST, '0', '복학')
+			                                                         , '1', '휴학')
+			                                                         , '2', '자퇴')
+			                                                         , '3', '조기졸업') AS CONT
+			              , NVL(A.AC_REASON, ' ') AS REASON
+			        FROM    ACADEMIC_CHG A
+			        LEFT OUTER JOIN STUDENT B
+			        ON(B.STU_NUM = A.STU_NUM)
+			        LEFT OUTER JOIN DEPARTMENT C
+			        ON(C.DEPT_NUM = B.DEPT_NUM)
+
+			        UNION ALL
+
+			        SELECT  GP_NUM AS NUM
+			              , REPLACE(REPLACE(REPLACE(A.GP_CHECK, '0', '대기')
+		                                          , '1', '승인')
+		                                          , '2', '반려') AS CHG_CHECK
+			              , A.STU_NUM
+			              , C.DEPT_NM
+			              , B.STU_NM_KOR
+			              , '졸업유예' AS CONT
+			              , ' ' AS REASON
+			        FROM    GRADUATION_POST A
+			        LEFT OUTER JOIN STUDENT B
+			        ON(B.STU_NUM = A.STU_NUM)
+			        LEFT OUTER JOIN DEPARTMENT C
+			        ON(C.DEPT_NUM = B.DEPT_NUM)
+			    )U
+
+			WHERE   1 = 1
+			AND		STU_NM_KOR LIKE '%' || #{keyStuNmKor} || '%'
+			ORDER BY CHG_CHECK ASC, NUM ASC
+
+	</select>
+
+	<!-- 학적변동 + 졸업유예 신청내역 중 '학생명'으로 검색한 결과 COUNT -->
+	<select id="getAcGpListIncSearchCNT" parameterType="hashMap" resultType="int">
+		SELECT  ((SELECT  COUNT(*) AS CNT
+		          FROM    ACADEMIC_CHG A
+		          LEFT OUTER JOIN STUDENT B
+		          ON(B.STU_NUM = A.STU_NUM)
+		          WHERE   B.STU_NM_KOR LIKE '%' || #{keyStuNmKor} || '%')
+		        +
+		         (SELECT  COUNT(*) AS CNT
+		          FROM    GRADUATION_POST A
+		          LEFT OUTER JOIN STUDENT B
+		          ON(B.STU_NUM = A.STU_NUM)
+		          WHERE   B.STU_NM_KOR LIKE '%' || #{keyStuNmKor} || '%')
+		        )AS CNT
+		FROM DUAL
+	</select>
+
+	<!-- 학적변동 + 졸업유예 신청목록 출력(학과명으로 검색한 결과) -->
+	<select id="getAcGpListIncSearchDept" parameterType="hashMap" resultType="hashMap">
+
+			SELECT U.*
+			FROM(
+			        SELECT  AC_NUM AS NUM
+			              , REPLACE(REPLACE(REPLACE(A.AC_CHECK, '0', '대기')
+						                                           , '1', '승인')
+						                                           , '2', '반려') AS CHG_CHECK
+			              , A.STU_NUM
+			              , C.DEPT_NM
+			              , B.STU_NM_KOR
+			              , REPLACE(REPLACE(REPLACE(REPLACE(A.AC_LIST, '0', '복학')
+			                                                         , '1', '휴학')
+			                                                         , '2', '자퇴')
+			                                                         , '3', '조기졸업') AS CONT
+			              , NVL(A.AC_REASON, ' ') AS REASON
+			        FROM    ACADEMIC_CHG A
+			        LEFT OUTER JOIN STUDENT B
+			        ON(B.STU_NUM = A.STU_NUM)
+			        LEFT OUTER JOIN DEPARTMENT C
+			        ON(C.DEPT_NUM = B.DEPT_NUM)
+
+			        UNION ALL
+
+			        SELECT  GP_NUM AS NUM
+			              , REPLACE(REPLACE(REPLACE(A.GP_CHECK, '0', '대기')
+					                                          , '1', '승인')
+					                                          , '2', '반려') AS CHG_CHECK
+			              , A.STU_NUM
+			              , C.DEPT_NM
+			              , B.STU_NM_KOR
+			              , '졸업유예' AS CONT
+			              , ' ' AS REASON
+			        FROM    GRADUATION_POST A
+			        LEFT OUTER JOIN STUDENT B
+			        ON(B.STU_NUM = A.STU_NUM)
+			        LEFT OUTER JOIN DEPARTMENT C
+			        ON(C.DEPT_NUM = B.DEPT_NUM)
+			    )U
+
+			WHERE   1 = 1
+			AND		DEPT_NM LIKE '%' || #{keyDeptNm} || '%'
+			ORDER BY CHG_CHECK ASC, NUM ASC
+
+	</select>
+
+	<!-- 학적변동 + 졸업유예 신청내역 중 '학과명'으로 검색한 결과 COUNT -->
+	<select id="getAcGpListIncSearchDeptCNT" parameterType="hashMap" resultType="int">
+		SELECT  ((SELECT  COUNT(*) AS CNT
+		          FROM    ACADEMIC_CHG A
+		          LEFT OUTER JOIN STUDENT B
+		          ON(B.STU_NUM = A.STU_NUM)
+		          LEFT OUTER JOIN DEPARTMENT C
+		          ON(C.DEPT_NUM = B.DEPT_NUM)
+		          WHERE   C.DEPT_NM LIKE  '%' || #{keyDeptNm} || '%')
+		        +
+		         (SELECT  COUNT(*) AS CNT
+		          FROM    GRADUATION_POST A
+		          LEFT OUTER JOIN STUDENT B
+		          ON(B.STU_NUM = A.STU_NUM)
+		          LEFT OUTER JOIN DEPARTMENT C
+		          ON(C.DEPT_NUM = B.DEPT_NUM)
+		          WHERE   C.DEPT_NM LIKE  '%' || #{keyDeptNm} || '%')
+		        )AS CNT
+		FROM DUAL
+	</select>
+
+	<!-- 복수전공/부전공 신청목록 출력(학생명으로 검색한 결과) -->
+	<select id="getDMListIncSearch" parameterType="hashMap" resultType="hashMap">
+		SELECT	U.*
+		FROM	(
+					SELECT  A.DM_NUM
+					      , REPLACE(REPLACE(REPLACE(A.DM_CHECK, '0', '대기')
+					                                          , '1', '승인')
+					                                          , '2', '반려')AS DM_CHECK
+					      , A.STU_NUM
+					      , C.DEPT_NM AS MAJOR_DEPT_NM
+					      , B.STU_NM_KOR
+					      , REPLACE(REPLACE(A.DM_DIVISION, '0', '복수전공'), '1', '부전공') AS DM_DIVISION
+					      , A.DM_COMRE
+					      , D.DEPT_NM AS APP_DEPT_NM
+					      , D.DEPT_NUM AS APP_DEPT_NUM
+					FROM    DOUBLE_MAJOR A
+					LEFT OUTER JOIN STUDENT B
+					ON(B.STU_NUM = A.STU_NUM)
+					LEFT OUTER JOIN DEPARTMENT C
+					ON(C.DEPT_NUM = B.DEPT_NUM)
+					LEFT OUTER JOIN DEPARTMENT D
+					ON(D.DEPT_NUM = A.DEPT_NO)
+				)U
+		WHERE	1 = 1
+		AND		STU_NM_KOR LIKE '%' || #{keyStuNmKor} || '%'
+		ORDER BY DM_CHECK ASC, DM_NUM ASC
+	</select>
+
+	<!-- 복수전공/부전공 신청내역 중 학생명으로 검색한 결과 count -->
+	<select id="getDMListIncSearchCNT" parameterType="hashMap" resultType="int">
+		SELECT  COUNT(*) AS CNT
+		FROM    DOUBLE_MAJOR A
+		LEFT OUTER JOIN  STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		WHERE     B.STU_NM_KOR LIKE '%' || #{keyStuNmKor} || '%'
+	</select>
+
+	<!-- 복수전공/부전공 신청목록 출력(학과명으로 검색한 결과) -->
+	<select id="getDMListIncSearchDept" parameterType="hashMap" resultType="hashMap">
+		SELECT	U.*
+		FROM	(
+					SELECT  A.DM_NUM
+					      , REPLACE(REPLACE(REPLACE(A.DM_CHECK, '0', '대기')
+					                                          , '1', '승인')
+					                                          , '2', '반려')AS DM_CHECK
+					      , A.STU_NUM
+					      , C.DEPT_NM AS MAJOR_DEPT_NM
+					      , B.STU_NM_KOR
+					      , REPLACE(REPLACE(A.DM_DIVISION, '0', '복수전공'), '1', '부전공') AS DM_DIVISION
+					      , A.DM_COMRE
+					      , D.DEPT_NM AS APP_DEPT_NM
+					      , D.DEPT_NUM AS APP_DEPT_NUM
+					FROM    DOUBLE_MAJOR A
+					LEFT OUTER JOIN STUDENT B
+					ON(B.STU_NUM = A.STU_NUM)
+					LEFT OUTER JOIN DEPARTMENT C
+					ON(C.DEPT_NUM = B.DEPT_NUM)
+					LEFT OUTER JOIN DEPARTMENT D
+					ON(D.DEPT_NUM = A.DEPT_NO)
+				)U
+		WHERE	1 = 1
+		AND		MAJOR_DEPT_NM LIKE '%' || #{deptNm} || '%'
+		ORDER BY DM_CHECK ASC, DM_NUM ASC
+	</select>
+
+	<!-- 복수전공/부전공 신청내역 중 학과명으로 검색한 결과 count -->
+	<select id="getDMListIncSearchDeptCNT" parameterType="hashMap" resultType="int">
+		SELECT  COUNT(*) AS CNT
+		FROM    DOUBLE_MAJOR A
+		LEFT OUTER JOIN  STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = B.DEPT_NUM)
+		WHERE	C.DEPT_NM LIKE '%' || #{deptNm} || '%'
+	</select>
+
+	<!-- 전과 신청내역 중 학생명으로 검색한 결과 -->
+	<select id="getTDListIncSearch" parameterType="hashMap" resultType="hashMap">
+		SELECT  U.*
+		FROM(
+		        SELECT  A.TD_NUM
+		        	  , REPLACE(REPLACE(REPLACE(A.TD_CHECK, '0', '대기')
+				                                          , '1', '승인')
+				                                          , '2', '반려')AS TD_CHECK
+		              , A.STU_NUM
+		              , C.DEPT_NM AS MAJOR_DEPT_NM
+		              , B.STU_NM_KOR
+		              , D.DEPT_NM AS APP_DEPT_NM
+		              , D.DEPT_NUM AS APP_DEPT_NUM
+		        FROM    TRANSFER_DP A
+		        LEFT OUTER JOIN STUDENT B
+		        ON(B.STU_NUM = A.STU_NUM)
+		        LEFT OUTER JOIN DEPARTMENT C
+		        ON(C.DEPT_NUM = B.DEPT_NUM)
+		        LEFT OUTER JOIN DEPARTMENT D
+		        ON(D.DEPT_NUM = A.DEPT_NUM)
+		    )U
+		WHERE   1 = 1
+		AND     STU_NM_KOR LIKE '%' || #{keyStuNmKor} || '%'
+		ORDER BY TD_CHECK ASC, TD_NUM ASC
+	</select>
+
+	<!-- 전과 신청내역 중 학생명으로 검색한 결과 count -->
+	<select id="getTDListIncSearchCNT" parameterType="hashMap" resultType="int">
+		SELECT  COUNT(*) AS CNT
+		FROM    TRANSFER_DP A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		WHERE     B.STU_NM_KOR LIKE '%' || #{keyStuNmKor} || '%'
+	</select>
+
+	<!-- 전과 신청내역 중 학과명으로 검색한 결과 -->
+	<select id="getTDListIncSearchDept" parameterType="hashMap" resultType="hashMap">
+		SELECT  U.*
+		FROM(
+		        SELECT  A.TD_NUM
+		              , REPLACE(REPLACE(REPLACE(A.TD_CHECK, '0', '대기')
+				                                          , '1', '승인')
+				                                          , '2', '반려')AS TD_CHECK
+		              , A.STU_NUM
+		              , C.DEPT_NM AS MAJOR_DEPT_NM
+		              , B.STU_NM_KOR
+		              , D.DEPT_NM AS APP_DEPT_NM
+		              , D.DEPT_NUM AS APP_DEPT_NUM
+		        FROM    TRANSFER_DP A
+		        LEFT OUTER JOIN STUDENT B
+		        ON(B.STU_NUM = A.STU_NUM)
+		        LEFT OUTER JOIN DEPARTMENT C
+		        ON(C.DEPT_NUM = B.DEPT_NUM)
+		        LEFT OUTER JOIN DEPARTMENT D
+		        ON(D.DEPT_NUM = A.DEPT_NUM)
+		    )U
+		WHERE   1 = 1
+		AND     MAJOR_DEPT_NM LIKE '%' || #{deptNm} || '%'
+		ORDER BY TD_CHECK ASC, TD_NUM ASC
+	</select>
+
+	<!-- 전과 신청내역 중 학과명으로 검색한 결과 count -->
+	<select id="getTDListIncSearchDeptCNT" parameterType="hashMap" resultType="int">
+		SELECT  COUNT(*) AS CNT
+		FROM    TRANSFER_DP A
+		LEFT OUTER JOIN STUDENT B
+		ON(B.STU_NUM = A.STU_NUM)
+		LEFT OUTER JOIN DEPARTMENT C
+		ON(C.DEPT_NUM = A.TD_OLD)
+		WHERE     C.DEPT_NM LIKE '%' || #{deptNm} || '%'
+	</select>
+	<!-- 검색 끝 -->
+</mapper>
+
+
+
+
+
+
+
+
+

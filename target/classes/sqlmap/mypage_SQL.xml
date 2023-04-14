@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+  <mapper namespace="kr.or.ddit.mapper.MypageMapper">
+
+  	<!-- 학생 -->
+  	<select id="stuInfo" parameterType="int" resultType="stuVO">
+		SELECT C.COLL_NM, D.STU_NUM, D.DEPT_NUM, D.STU_NM_KOR, D.STU_NM_ENG, D.STU_REG1,
+		                        D.STU_EMAIL, D.STU_PN, D.STU_PHOTO, D.STU_MS, D.STU_HDC,
+		                        D.STU_NATION, D.STU_ZIP, D.STU_ADDR1, D.STU_ADDR2, D.STU_MINOR,
+		                        D.STU_DMAJOR, D.STU_BANK, D.STU_ACCOUNT, D.STU_STATUS, D.STU_SEMESTER,
+		                        D.DEPT_NM
+		FROM COLLEAGE C LEFT OUTER JOIN (
+		                SELECT A.STU_NUM AS STU_NUM, A.DEPT_NUM, A.STU_NM_KOR, A.STU_NM_ENG, A.STU_REG1,
+		                        A.STU_EMAIL, A.STU_PN, A.STU_PHOTO, A.STU_MS, A.STU_HDC,
+		                        A.STU_NATION, A.STU_ZIP, A.STU_ADDR1, A.STU_ADDR2, A.STU_MINOR,
+		                        A.STU_DMAJOR, A.STU_BANK, A.STU_ACCOUNT, A.STU_STATUS, A.STU_SEMESTER,
+		                        B.DEPT_NM, B.COLL_NUM AS COLL_NUM
+		                FROM STUDENT A LEFT OUTER JOIN DEPARTMENT B
+		                ON(A.DEPT_NUM = B.DEPT_NUM)
+		                WHERE A.STU_NUM = #{username}) D
+		ON (D.COLL_NUM = C.COLL_NUM)
+		WHERE C.COLL_NUM = D.COLL_NUM
+  	</select>
+
+  	<update id="stuMypageUpdate" parameterType="stuVO">
+  		UPDATE STUDENT SET STU_EMAIL = #{stuEmail}, STU_PN = #{stuPn}, STU_PHOTO = #{stuPhoto}, STU_MS = #{stuMs}, STU_HDC = #{stuHdc},
+  					STU_ZIP = #{stuZip}, STU_ADDR1 = #{stuAddr1}, STU_ADDR2 = #{stuAddr2}, STU_BANK = #{stuBank}, STU_ACCOUNT = #{stuAccount}
+  		WHERE STU_NUM = #{stuNum}
+  	</update>
+
+  	<update id="pwUpdate" parameterType="userVO">
+  		UPDATE USERS SET PASSWORD = (SELECT pkg_crypto.encrypt(#{password}) from dual)
+  		WHERE USERNAME = #{username}
+  	</update>
+
+
+	<!-- 교수 -->
+  	<select id="teaInfo" parameterType="int" resultType="teaVO">
+		SELECT C.COLL_NM, D.TEA_NUM, D.DEPT_NUM, D.TEA_NM_KOR, D.TEA_NM_ENG, D.TEA_REG1, D.TEA_TITLE, D.TEA_LNM, D.TEA_LNUM,
+		                        D.TEA_REG2, D.TEA_EMAIL, D.TEA_PN, D.TEA_PHOTO, D.TEA_HDC,
+		                        D.TEA_NATION, D.TEA_ZIP, D.TEA_ADDR1, D.TEA_ADDR2,
+		                        D.TEA_BANK, D.TEA_ACCOUNT, D.DEPT_NM
+		FROM COLLEAGE C LEFT OUTER JOIN (
+		                SELECT A.TEA_NUM AS TEA_NUM, A.DEPT_NUM, A.TEA_NM_KOR, A.TEA_NM_ENG, A.TEA_REG1,
+		                        A.TEA_REG2, A.TEA_EMAIL, A.TEA_PN, A.TEA_PHOTO, A.TEA_HDC,
+		                        A.TEA_NATION, A.TEA_ZIP, A.TEA_ADDR1, A.TEA_ADDR2, A.TEA_TITLE, A.TEA_LNM, A.TEA_LNUM,
+		                        A.TEA_BANK, A.TEA_ACCOUNT,
+		                        B.DEPT_NM, B.COLL_NUM AS COLL_NUM
+		                FROM TEACHER A LEFT OUTER JOIN DEPARTMENT B
+		                ON(A.DEPT_NUM = B.DEPT_NUM)
+		                WHERE A.TEA_NUM = #{username}) D
+		ON (D.COLL_NUM = C.COLL_NUM)
+		WHERE C.COLL_NUM = D.COLL_NUM
+  	</select>
+
+  	<update id="teaMypageUpdate" parameterType="teaVO">
+  		UPDATE TEACHER SET TEA_NM_ENG = #{teaNmEng}, TEA_EMAIL = #{teaEmail}, TEA_PN = #{teaPn}, TEA_PHOTO = #{teaPhoto}, TEA_HDC = #{teaHdc},
+  					TEA_ZIP = #{teaZip}, TEA_ADDR1 = #{teaAddr1}, TEA_ADDR2 = #{teaAddr2}, TEA_BANK = #{teaBank}, TEA_ACCOUNT = #{teaAccount}
+  		WHERE TEA_NUM = #{teaNum}
+  	</update>
+
+
+
+	<!-- 관리자 -->
+  	<select id="admInfo" parameterType="int" resultType="admVO">
+        SELECT EMP_NUM, EMP_NM_KOR, EMP_NM_ENG, EMP_PHOTO, EMP_PN,
+                EMP_EMAIL, EMP_REG1, EMP_REG2, EMP_NATION, EMP_ZIP, EMP_ADDR1,
+                EMP_ADDR2, EMP_GROUP, EMP_DP, EMP_TITLE, EMP_MS, EMP_HDC, EMP_BANK,
+                EMP_ACCOUNT
+       FROM EMPLOYEE
+       WHERE EMP_NUM = #{username}
+  	</select>
+
+  	<update id="admMypageUpdate" parameterType="admVO">
+  		UPDATE EMPLOYEE SET EMP_NM_ENG = #{empNmEng}, EMP_EMAIL = #{empEmail}, EMP_PN = #{empPn}, EMP_PHOTO = #{empPhoto}, EMP_HDC = #{empHdc},
+  					EMP_MS = #{empMs}, EMP_ZIP = #{empZip}, EMP_ADDR1 = #{empAddr1}, EMP_ADDR2 = #{empAddr2}, EMP_BANK = #{empBank}, EMP_ACCOUNT = #{empAccount}
+  		WHERE EMP_NUM = #{empNum}
+  	</update>
+
+  	<select id="statistics" resultType="map">
+		SELECT A.SUM
+		FROM (
+		        SELECT EXTRACT(YEAR FROM TP_DT) AS YEAR, SUM(TP_AMT) AS SUM
+		        FROM TUITION_PAY
+		        GROUP BY EXTRACT(YEAR FROM TP_DT)
+		        ORDER BY YEAR) A
+  	</select>
+
+  	<select id="mainInfo" resultType="map">
+		SELECT S.*, E.*, U.*
+		FROM (SELECT A.ALLSTU, B.NEWSTU
+		        FROM (SELECT COUNT(*) AS ALLSTU FROM STUDENT WHERE STU_STATUS IN(0, 2, 5)) A,
+		                (SELECT COUNT(*) AS NEWSTU FROM STUDENT WHERE STU_NUM LIKE '2023%') B) S,
+		     (SELECT A.TEA, B.ADM
+		        FROM (SELECT COUNT(*) AS TEA FROM TEACHER) A,
+		             (SELECT COUNT(*) AS ADM FROM EMPLOYEE) B) E,
+		     (SELECT A.DP, B.COLL, C.ROOM
+		FROM (SELECT COUNT(*) AS DP FROM DEPARTMENT) A,
+		     (SELECT COUNT(*) AS COLL FROM COLLEAGE) B,
+		     (SELECT COUNT(*) AS ROOM FROM ROOM) C) U
+  	</select>
+
+	<select id="getCount" parameterType="int" resultType="map">
+		SELECT G.OBJC, C.RSVT
+		FROM (SELECT COUNT(A.GO_NUM) AS OBJC
+		        FROM GRADE_OBJC A, SUBJECT B
+		        WHERE B.SBJ_OC = 1 AND A.GO_CHECK = 0 AND B.TEA_NUM = #{data} AND A.SBJ_NUM = B.SBJ_NUM) G,
+		     (SELECT COUNT(* )AS RSVT
+		        FROM CON_RSVT
+		        WHERE TEA_NUM = #{data} AND CR_CHECK = 0) C
+	</select>
+
+
+  </mapper>
